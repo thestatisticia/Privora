@@ -5,6 +5,9 @@
  */
 
 import * as StellarSdk from "@stellar/stellar-sdk";
+import type { Proposal } from "@/lib/types/proposal";
+
+export type { Proposal } from "@/lib/types/proposal";
 
 const CONTRACT_ID = process.env.NEXT_PUBLIC_CONTRACT_ID || "";
 const NETWORK_PASSPHRASE =
@@ -16,22 +19,9 @@ const RPC_URL =
   "https://soroban-testnet.stellar.org";
 const RELAYER_SECRET = process.env.NEXT_PUBLIC_RELAYER_SECRET || "";
 const DEFAULT_ROOT = process.env.NEXT_PUBLIC_MERKLE_ROOT || "";
-// Read-only simulations need a source account that EXISTS on the network.
-// The funded relayer works; an unfunded placeholder makes simulate fail.
 const SIM_SOURCE =
   process.env.NEXT_PUBLIC_RELAYER_PUBLIC ||
   "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN";
-
-export interface Proposal {
-  id: number;
-  title: string;
-  description: string;
-  yes_count: number;
-  no_count: number;
-  end_time: number; // unix timestamp (seconds)
-  is_active: boolean;
-  merkleRoot?: string; // this proposal's eligible-voter snapshot root (hex)
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

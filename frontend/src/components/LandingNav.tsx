@@ -42,7 +42,7 @@ export default function LandingNav() {
 
         <div className="flex-shrink-0 min-w-[140px] flex items-center justify-end gap-2 ml-auto lg:ml-0">
           <ThemeToggle />
-          <Link href="/proposals" className="btn btn-primary text-sm py-2.5 hidden sm:inline-flex">
+          <Link href="/proposals" prefetch className="btn btn-primary text-sm py-2.5 hidden sm:inline-flex">
             Launch app
           </Link>
           <button

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  compress: true,
   webpack: (config) => {
     // Required for snarkjs — it uses Node built-ins
     config.resolve.fallback = {

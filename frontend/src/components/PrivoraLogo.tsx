@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 type Size = "sm" | "md" | "lg";
 
@@ -14,7 +17,6 @@ const TEXT: Record<Size, string> = {
   lg: "text-lg",
 };
 
-/** Inline SVG mark — zero network requests, instant paint */
 export function PrivoraMark({ className = "w-7 h-7" }: { className?: string }) {
   return (
     <svg
@@ -59,11 +61,14 @@ export default function PrivoraLogo({
   className = "",
   href = "/",
 }: Props) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const inner = (
     <>
       <PrivoraMark className={`${ICON[size]} shrink-0 logo-mark`} />
       {showText && (
-        <span className={`${TEXT[size]} font-semibold tracking-[-0.02em]`}>
+        <span className={`${TEXT[size]} font-semibold tracking-[-0.02em]`} suppressHydrationWarning>
           Priv<span className="text-[var(--accent)]">ora</span>
         </span>
       )}
@@ -74,8 +79,13 @@ export default function PrivoraLogo({
 
   if (href) {
     return (
-      <Link href={href} className={base}>
-        {inner}
+      <Link href={href} className={base} suppressHydrationWarning>
+        {mounted ? inner : (
+          <>
+            <PrivoraMark className={`${ICON[size]} shrink-0 logo-mark`} />
+            {showText && <span className={`${TEXT[size]} font-semibold tracking-[-0.02em]`}>Privora</span>}
+          </>
+        )}
       </Link>
     );
   }

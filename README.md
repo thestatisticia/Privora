@@ -23,13 +23,23 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Deploy to Vercel
 
-1. Push this repo to GitHub
-2. Import the project in [Vercel](https://vercel.com)
-3. Set **Root Directory** to `frontend`
-4. Add the environment variables from `frontend/.env.example`
-5. Deploy
+1. Import [github.com/thestatisticia/Privora](https://github.com/thestatisticia/Privora) in Vercel
+2. Set **Root Directory** to `frontend`
+3. Add these environment variables (copy values from your local `.env.local`):
 
-The build uses `npm run build` (webpack mode — required for snarkjs).
+| Variable | Example |
+|---|---|
+| `NEXT_PUBLIC_CONTRACT_ID` | Soroban contract address |
+| `NEXT_PUBLIC_NETWORK` | `testnet` |
+| `NEXT_PUBLIC_RPC_URL` | `https://soroban-testnet.stellar.org` |
+| `NEXT_PUBLIC_MERKLE_ROOT` | Decimal Merkle root from snapshot |
+| `NEXT_PUBLIC_RELAYER_SECRET` | Testnet relayer secret key |
+| `NEXT_PUBLIC_RELAYER_PUBLIC` | Relayer public address |
+| `NEXT_PUBLIC_ADMIN_WALLET` | Admin wallet for `/review` |
+
+4. Deploy — build command is `npm run build` (auto-detected)
+
+**Note:** The relayer secret is client-side for this demo. Move it to a server API route before mainnet.
 
 ## How voting works
 

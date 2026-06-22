@@ -1,4 +1,4 @@
-import { Proposal } from "@/lib/stellar";
+import type { Proposal } from "@/lib/types/proposal";
 
 export function isProposalActive(proposal: Proposal): boolean {
   return proposal.is_active && Math.floor(Date.now() / 1000) < proposal.end_time;

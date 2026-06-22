@@ -2,34 +2,45 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getAllProposals, Proposal, MOCK_PROPOSALS } from "@/lib/stellar";
+import type { Proposal } from "@/lib/types/proposal";
 import { votePercents } from "@/lib/proposal-utils";
 
-const FALLBACK =
-  MOCK_PROPOSALS.find((p) => p.is_active) ?? MOCK_PROPOSALS[0];
+const FALLBACK: Proposal = {
+  id: 0,
+  title: "Allocate 50,000 XLM to Developer Grants",
+  description:
+    "Fund early-stage Soroban projects with community-selected grants. Focus: DeFi, privacy, and identity.",
+  yes_count: 142,
+  no_count: 31,
+  end_time: 4102444800,
+  is_active: true,
+};
 
 export default function LandingLiveVoteCard() {
   const [proposal, setProposal] = useState<Proposal>(FALLBACK);
   const [hover, setHover] = useState<"yes" | "no" | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    getAllProposals()
-      .then((list) => {
+    if (!mounted) return;
+    fetch("/api/proposals")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: Proposal[]) => {
         const active = list.filter((p) => p.is_active);
         const picked = active[0] ?? list[0];
         if (picked) setProposal(picked);
       })
-      .catch(() => {
-        /* keep fallback — card is always visible */
-      });
-  }, []);
+      .catch(() => {});
+  }, [mounted]);
 
   const { total, yesPercent, noPercent } = votePercents(proposal);
   const voteHref = `/vote/${proposal.id}`;
 
   return (
     <div id="live-vote" className="landing-vote-card scroll-mt-24">
-      <div className="landing-vote-card-glow" aria-hidden />
+      <div className="landing-vote-card-glow pointer-events-none" aria-hidden />
 
       <div className="relative rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border)] bg-[var(--background)]">
