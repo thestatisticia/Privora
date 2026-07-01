@@ -5,7 +5,7 @@ import React, {
   useContext,
   useState,
   useCallback,
-  useEffect,
+  useSyncExternalStore,
 } from "react";
 
 interface WalletContextType {
@@ -26,6 +26,21 @@ const WalletContext = createContext<WalletContextType>({
   disconnect: () => {},
 });
 
+const walletListeners = new Set<() => void>();
+
+function subscribeWallet(onStoreChange: () => void) {
+  walletListeners.add(onStoreChange);
+  return () => walletListeners.delete(onStoreChange);
+}
+
+function notifyWalletListeners() {
+  walletListeners.forEach((cb) => cb());
+}
+
+function readStoredAddress(): string | null {
+  return sessionStorage.getItem("sb_wallet_address");
+}
+
 let freighterApi: typeof import("@stellar/freighter-api") | null = null;
 if (typeof window !== "undefined") {
   import("@stellar/freighter-api").then((mod) => {
@@ -36,15 +51,15 @@ if (typeof window !== "undefined") {
 }
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const [address, setAddress] = useState<string | null>(null);
+  const restoredAddress = useSyncExternalStore(
+    subscribeWallet,
+    readStoredAddress,
+    () => null
+  );
+  const [liveAddress, setLiveAddress] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Auto-reconnect if previously connected
-  useEffect(() => {
-    const saved = sessionStorage.getItem("sb_wallet_address");
-    if (saved) setAddress(saved);
-  }, []);
+  const address = liveAddress ?? restoredAddress;
 
   const connect = useCallback(async () => {
     if (!freighterApi) {
@@ -78,8 +93,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (!addr) {
         throw new Error("No address returned from Freighter.");
       }
-      setAddress(addr);
+      setLiveAddress(addr);
       sessionStorage.setItem("sb_wallet_address", addr);
+      notifyWalletListeners();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to connect wallet";
       setError(msg);
@@ -89,8 +105,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const disconnect = useCallback(() => {
-    setAddress(null);
+    setLiveAddress(null);
     sessionStorage.removeItem("sb_wallet_address");
+    notifyWalletListeners();
   }, []);
 
   return (

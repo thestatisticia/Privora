@@ -35,8 +35,9 @@
     --text-secondary: #b8b8b8;
     --surface: #0a0a0a;
     --surface-2: #111111;
-    --border: #222222;
-    --border-strong: #333333;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --border-subtle: rgba(255, 255, 255, 0.04);
     --accent: #fdda24;
     --accent-fg: #000000;
     --mesh-line: rgba(255, 255, 255, 0.018);
@@ -47,18 +48,19 @@
   html.light {
     color-scheme: light;
     --background: #ffffff;
-    --foreground: #0a0a0a;
-    --muted: #666666;
-    --muted-2: #888888;
-    --text-secondary: #444444;
-    --surface: #fafafa;
-    --surface-2: #f4f4f4;
-    --border: #e5e5e5;
-    --border-strong: #d4d4d4;
-    --accent: #0a0a0a;
+    --foreground: #111111;
+    --muted: #737373;
+    --muted-2: #a3a3a3;
+    --text-secondary: #525252;
+    --surface: #ffffff;
+    --surface-2: #fafafa;
+    --border: rgba(0, 0, 0, 0.07);
+    --border-strong: rgba(0, 0, 0, 0.11);
+    --border-subtle: rgba(0, 0, 0, 0.04);
+    --accent: #111111;
     --accent-fg: #ffffff;
-    --mesh-line: rgba(0, 0, 0, 0.05);
-    --mesh-glow: rgba(0, 0, 0, 0.03);
+    --mesh-line: rgba(0, 0, 0, 0.022);
+    --mesh-glow: transparent;
     --nav-bg: rgba(255, 255, 255, 0.92);
   }
 
@@ -131,6 +133,30 @@
     background-size: 100% 100%, 72px 72px, 72px 72px;
   }
 
+  /* App interior — flat, minimal grid */
+  .mesh-bg-app {
+    background-color: var(--background);
+    background-image: linear-gradient(var(--mesh-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--mesh-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  html.light .mesh-bg-app {
+    background-image: none;
+  }
+
+  .shell-border-r {
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  .shell-border-b {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .shell-border-t {
+    border-top: 1px solid var(--border-subtle);
+  }
+
   .hero-orb {
     position: absolute;
     top: 10%;
@@ -184,13 +210,13 @@
   /* ── Surfaces ── */
   .surface {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
   }
 
   .surface-2 {
     background: var(--surface-2);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
   }
 
@@ -332,7 +358,7 @@
     background: var(--nav-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .glass {

@@ -3,15 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useWallet, truncateAddress } from "@/lib/wallet";
-import { ADMIN_WALLET, isAdmin } from "@/lib/allowlist";
+import { ADMIN_WALLET, isReviewer } from "@/lib/allowlist";
 import { HubBackLink, HubPage, HubPageTitle } from "@/components/hub/HubPage";
-import {
-  getAdmin,
-  getSubmissions,
-  approveSubmission,
-  rejectSubmission,
-  Submission,
-} from "@/lib/stellar";
+import type { Submission } from "@/lib/stellar";
 
 function days(seconds: number): string {
   const d = Math.round(seconds / 86400);
@@ -20,7 +14,7 @@ function days(seconds: number): string {
 
 export default function ReviewPage() {
   const { address, connected, connecting, connect } = useWallet();
-  const allowed = isAdmin(address);
+  const allowed = isReviewer(address);
 
   const [subs, setSubs] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,32 +23,59 @@ export default function ReviewPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
-    Promise.all([getSubmissions(), getAdmin()])
-      .then(([s, admin]) => {
-        setSubs(s);
-        setChainAdmin(admin);
+    try {
+      const r = await fetch("/api/review");
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Failed to load review queue");
+      setSubs(data.submissions ?? []);
+      setChainAdmin(data.chainAdmin ?? null);
+    } catch (err: unknown) {
+      setSubs([]);
+      setFetchError(
+        err instanceof Error ? err.message : "Failed to load submissions from Soroban"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/review")
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Failed to load review queue");
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setSubs(data.submissions ?? []);
+        setChainAdmin(data.chainAdmin ?? null);
       })
       .catch((err: unknown) => {
+        if (cancelled) return;
         setSubs([]);
         setFetchError(
           err instanceof Error ? err.message : "Failed to load submissions from Soroban"
         );
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const handleApprove = async (id: number) => {
     if (!address || !allowed) return;
     setBusyId(id);
     setError(null);
     try {
+      const { approveSubmission } = await import("@/lib/stellar");
       await approveSubmission(address, id);
       load();
     } catch (err: unknown) {
@@ -69,6 +90,7 @@ export default function ReviewPage() {
     setBusyId(id);
     setError(null);
     try {
+      const { rejectSubmission } = await import("@/lib/stellar");
       await rejectSubmission(address, id);
       load();
     } catch (err: unknown) {
@@ -109,13 +131,13 @@ export default function ReviewPage() {
       )}
 
       {!connected ? (
-        <div className="surface p-5 mb-6 border-stellar-purple/25">
-          <p className="text-gray-400 text-sm mb-4">
-            Connect the admin wallet to approve or reject submissions. The queue below is
-            read from Soroban — no wallet needed to view it.
+        <div className="surface p-5 mb-6 border-[var(--border-strong)]">
+          <p className="text-[var(--text-secondary)] text-sm mb-4">
+            The queue below is live from Soroban — anyone can view it. Connect the admin
+            wallet to approve or reject submissions.
           </p>
           <button onClick={connect} disabled={connecting} className="btn btn-primary px-6 py-3 text-sm">
-            {connecting ? "Connecting…" : "Connect Wallet"}
+            {connecting ? "Connecting…" : "Connect admin wallet"}
           </button>
           <p className="text-xs text-stellar-muted mt-3 font-mono">
             Admin: {truncateAddress(ADMIN_WALLET)}
@@ -131,10 +153,13 @@ export default function ReviewPage() {
           <p className="text-stellar-rose font-semibold mb-2">Not authorized to approve</p>
           <p className="text-stellar-muted text-sm">
             Connected{" "}
-            <span className="font-mono text-gray-300">{truncateAddress(address!)}</span> is not
-            the admin wallet. You can view the queue, but only{" "}
-            <span className="font-mono text-gray-300">{truncateAddress(chainAdmin || ADMIN_WALLET)}</span>{" "}
-            can approve or reject.
+            <span className="font-mono text-gray-300">{truncateAddress(address!)}</span> cannot
+            approve on-chain. Connect{" "}
+            <span className="font-mono text-gray-300">{truncateAddress(ADMIN_WALLET)}</span>
+            {chainAdmin && chainAdmin !== ADMIN_WALLET && (
+              <> (deploy admin: {truncateAddress(chainAdmin)})</>
+            )}
+            .
           </p>
         </div>
       ) : (

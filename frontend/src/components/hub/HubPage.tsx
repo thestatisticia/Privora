@@ -64,18 +64,18 @@ export function DetailRow({
   last,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   mono?: boolean;
   last?: boolean;
 }) {
   return (
     <div
       className={`flex items-center justify-between gap-6 px-6 py-4 ${
-        last ? "" : "border-b border-stellar"
+        last ? "" : "border-b border-[var(--border-subtle)]"
       }`}
     >
       <span className="text-sm text-stellar-muted">{label}</span>
-      <span className={`text-sm text-gray-100 text-right ${mono ? "font-mono text-xs" : ""}`}>
+      <span className={`text-sm text-[var(--foreground)] text-right ${mono ? "font-mono text-xs" : ""}`}>
         {value}
       </span>
     </div>

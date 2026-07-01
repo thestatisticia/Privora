@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
+  devIndicators: false,
+  experimental: {
+    optimizePackageImports: ["@stellar/stellar-sdk"],
+  },
   webpack: (config) => {
     // Required for snarkjs — it uses Node built-ins
     config.resolve.fallback = {

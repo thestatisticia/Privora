@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 type Theme = "dark" | "light";
@@ -22,36 +23,48 @@ const ThemeContext = createContext<ThemeContextType>({
   toggleTheme: () => {},
 });
 
+const themeListeners = new Set<() => void>();
+
+function readStoredTheme(): Theme {
+  const stored =
+    (localStorage.getItem("privora-theme") as Theme | null) ??
+    (localStorage.getItem("sb-theme") as Theme | null);
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: light)").matches
+    ? "light"
+    : "dark";
+}
+
+function subscribeTheme(onStoreChange: () => void) {
+  themeListeners.add(onStoreChange);
+  return () => themeListeners.delete(onStoreChange);
+}
+
+function notifyThemeListeners() {
+  themeListeners.forEach((cb) => cb());
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [ready, setReady] = useState(false);
+  const storedTheme = useSyncExternalStore(
+    subscribeTheme,
+    readStoredTheme,
+    () => "dark" as Theme
+  );
+  const [override, setOverride] = useState<Theme | null>(null);
+  const theme = override ?? storedTheme;
 
   useEffect(() => {
-    const stored =
-      (localStorage.getItem("privora-theme") as Theme | null) ??
-      (localStorage.getItem("sb-theme") as Theme | null);
-    const initial =
-      stored === "light" || stored === "dark"
-        ? stored
-        : window.matchMedia("(prefers-color-scheme: light)").matches
-          ? "light"
-          : "dark";
-    setThemeState(initial);
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
     const root = document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(theme);
     localStorage.setItem("privora-theme", theme);
-  }, [theme, ready]);
+    notifyThemeListeners();
+  }, [theme]);
 
-  const setTheme = useCallback((t: Theme) => setThemeState(t), []);
+  const setTheme = useCallback((t: Theme) => setOverride(t), []);
   const toggleTheme = useCallback(
-    () => setThemeState((t) => (t === "dark" ? "light" : "dark")),
-    []
+    () => setOverride((t) => (t ?? storedTheme) === "dark" ? "light" : "dark"),
+    [storedTheme]
   );
 
   return (

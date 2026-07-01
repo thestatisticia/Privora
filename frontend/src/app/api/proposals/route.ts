@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import { getAllProposals } from "@/lib/stellar";
+import { getCachedProposals } from "@/lib/server/proposals-cache";
+import { enrichProposals } from "@/lib/server/enrich-proposals";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const proposals = await getAllProposals();
+    const proposals = await enrichProposals(await getCachedProposals());
     return NextResponse.json(proposals, {
-      headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" },
+      headers: {
+        "Cache-Control": "public, s-maxage=20, stale-while-revalidate=60",
+      },
     });
   } catch {
     return NextResponse.json([], { status: 500 });

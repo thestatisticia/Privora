@@ -25,3 +25,30 @@ export function votePercents(proposal: Proposal) {
   const noPercent = total > 0 ? 100 - yesPercent : 0;
   return { total, yesPercent, noPercent };
 }
+
+export const DEFAULT_QUORUM_PERCENT = 25;
+
+export function turnoutStats(proposal: Proposal, eligible: number | null | undefined) {
+  const ballots = proposal.yes_count + proposal.no_count;
+  if (!eligible || eligible <= 0) {
+    return {
+      ballots,
+      eligible: null as number | null,
+      turnoutPercent: null as number | null,
+      quorumPercent: DEFAULT_QUORUM_PERCENT,
+      quorumMet: false,
+      quorumThreshold: null as number | null,
+    };
+  }
+  const turnoutPercent = Math.round((ballots / eligible) * 1000) / 10;
+  const quorumThreshold = Math.ceil(eligible * (DEFAULT_QUORUM_PERCENT / 100));
+  const quorumMet = ballots >= quorumThreshold;
+  return {
+    ballots,
+    eligible,
+    turnoutPercent,
+    quorumPercent: DEFAULT_QUORUM_PERCENT,
+    quorumMet,
+    quorumThreshold,
+  };
+}

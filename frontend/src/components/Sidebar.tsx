@@ -4,11 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useWallet, truncateAddress } from "@/lib/wallet";
-import { isAdmin } from "@/lib/allowlist";
 import ThemeToggle from "@/components/ThemeToggle";
 import PrivoraLogo from "@/components/PrivoraLogo";
 
-type NavItem = { href: string; label: string; icon: React.ReactNode; external?: boolean };
+type NavItem = { href: string; label: string; icon: React.ReactNode };
 type NavGroup = { heading: string; items: NavItem[] };
 
 function Icon({ d }: { d: string }) {
@@ -22,42 +21,31 @@ function Icon({ d }: { d: string }) {
 const ICONS = {
   governance: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
   submit: "M12 4v16m8-8H4",
-  collectibles: "M12 2l2.4 6.9H22l-6 4.3 2.3 7-6.3-4.5L5.7 20l2.3-7-6-4.3h7.6z",
+  rewards: "M12 2l2.4 6.9H22l-6 4.3 2.3 7-6.3-4.5L5.7 20l2.3-7-6-4.3h7.6z",
   verify: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
   review: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-  external: "M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14",
 };
 
-function useNavGroups(address: string | null): NavGroup[] {
+function useNavGroups(): NavGroup[] {
   return [
     {
-      heading: "Essentials",
+      heading: "Governance",
       items: [
         { href: "/proposals", label: "Proposals", icon: <Icon d={ICONS.governance} /> },
-        { href: "/create", label: "Submit", icon: <Icon d={ICONS.submit} /> },
+        { href: "/create", label: "Submit + voter list", icon: <Icon d={ICONS.submit} /> },
       ],
     },
     {
-      heading: "Tools",
+      heading: "Rewards & verify",
       items: [
-        { href: "/verify", label: "Verify", icon: <Icon d={ICONS.verify} /> },
-        { href: "/rewards", label: "Collectibles", icon: <Icon d={ICONS.collectibles} /> },
-        {
-          href: "https://stellar.expert/explorer/testnet",
-          label: "Explorer",
-          icon: <Icon d={ICONS.external} />,
-          external: true,
-        },
+        { href: "/rewards", label: "Rewards hub", icon: <Icon d={ICONS.rewards} /> },
+        { href: "/verify", label: "Verify vote", icon: <Icon d={ICONS.verify} /> },
       ],
     },
-    ...(isAdmin(address)
-      ? [
-          {
-            heading: "Admin",
-            items: [{ href: "/review", label: "Review", icon: <Icon d={ICONS.review} /> }],
-          },
-        ]
-      : []),
+    {
+      heading: "Administration",
+      items: [{ href: "/review", label: "Review queue", icon: <Icon d={ICONS.review} /> }],
+    },
   ];
 }
 
@@ -102,23 +90,14 @@ function NavList({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () =
                   ? "bg-[var(--surface-2)] text-[var(--foreground)]"
                   : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)]"
               }`;
-              if (item.external) {
-                return (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={onNavigate}
-                    className={cls}
-                  >
-                    {item.icon}
-                    <span className="flex-1">{item.label}</span>
-                  </a>
-                );
-              }
               return (
-                <Link key={item.href} href={item.href} onClick={onNavigate} className={cls}>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  prefetch
+                  onClick={onNavigate}
+                  className={cls}
+                >
                   {item.icon}
                   {item.label}
                 </Link>
@@ -132,18 +111,17 @@ function NavList({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () =
 }
 
 export default function Sidebar() {
-  const { address } = useWallet();
-  const groups = useNavGroups(address);
+  const groups = useNavGroups();
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <aside className="hidden md:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col border-r border-[var(--border)] bg-[var(--background)] z-40">
-        <div className="px-4 h-14 flex items-center border-b border-[var(--border)]">
+      <aside className="hidden md:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col shell-border-r bg-[var(--background)] z-40">
+        <div className="px-4 h-14 flex items-center shell-border-b">
           <Logo />
         </div>
         <NavList groups={groups} />
-        <div className="p-3 border-t border-[var(--border)] space-y-2">
+        <div className="p-3 shell-border-t space-y-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-[10px] uppercase tracking-widest text-[var(--muted)]">Theme</span>
             <ThemeToggle />
@@ -152,7 +130,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <div className="md:hidden fixed top-0 inset-x-0 h-14 flex items-center justify-between px-4 border-b border-[var(--border)] bg-[var(--background)] z-50">
+      <div className="md:hidden fixed top-0 inset-x-0 h-14 flex items-center justify-between px-4 shell-border-b bg-[var(--background)] z-50">
         <Logo />
         <div className="flex items-center gap-1">
           <ThemeToggle />
@@ -167,8 +145,8 @@ export default function Sidebar() {
       {open && (
         <div className="md:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-72 flex flex-col bg-[var(--background)] border-r border-[var(--border)]">
-            <div className="px-4 h-14 flex items-center justify-between border-b border-[var(--border)]">
+          <aside className="absolute inset-y-0 left-0 w-72 flex flex-col bg-[var(--background)] shell-border-r">
+            <div className="px-4 h-14 flex items-center justify-between shell-border-b">
               <Logo />
               <button type="button" onClick={() => setOpen(false)} aria-label="Close menu">
                 <svg className="w-5 h-5 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,7 +155,7 @@ export default function Sidebar() {
               </button>
             </div>
             <NavList groups={groups} onNavigate={() => setOpen(false)} />
-            <div className="p-3 border-t border-[var(--border)]">
+            <div className="p-3 shell-border-t">
               <WalletBlock />
             </div>
           </aside>

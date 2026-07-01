@@ -4,15 +4,22 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useWallet, truncateAddress } from "@/lib/wallet";
-import { getProposal, castVote, isNullifierUsed, Proposal } from "@/lib/stellar";
+import type { Proposal } from "@/lib/types/proposal";
 import {
   findIdentityBySecret,
   getIdentityForAddress,
+  getMockIdentityAt,
   getNullifierFor,
   getNullifierColumn,
   MockIdentity,
 } from "@/lib/merkle";
-import { generateVoteProof, nullifierToBytes32, ProofStatus } from "@/lib/zkproof";
+import { nullifierToBytes32 } from "@/lib/nullifier";
+import type { ProofStatus } from "@/lib/types/zkproof";
+import ClientTimeRemaining from "@/components/ClientTimeRemaining";
+import VoteProgressBar from "@/components/charts/VoteProgressBar";
+import TurnoutMeter from "@/components/TurnoutMeter";
+import PrivacyReceipt from "@/components/PrivacyReceipt";
+import { rootsMatch, parseVoterCredentialsJson } from "@/lib/snapshot-builder";
 import {
   HubBackLink,
   HubPage,
@@ -22,12 +29,11 @@ import {
   MetricCard,
 } from "@/components/hub/HubPage";
 import {
-  formatEnds,
   isProposalActive,
-  timeRemaining,
   votePercents,
 } from "@/lib/proposal-utils";
-import VoteDonutChart from "@/components/charts/VoteDonutChart";
+
+const DEMO_VOTER_SLOTS = [1, 2, 3, 4] as const;
 
 type VoteChoice = 0 | 1 | null;
 type FlowStep = "eligibility" | "proof" | "casting" | "success" | "error";
@@ -41,12 +47,14 @@ export default function VotePage() {
   const [loadingProposal, setLoadingProposal] = useState(true);
 
   // Identity / eligibility
-  const [identity, setIdentity] = useState<MockIdentity | null>(null);
-  const [isEligible, setIsEligible] = useState(false);
+  const [overrideIdentity, setOverrideIdentity] = useState<MockIdentity | null>(null);
+  const [walletIdentity, setWalletIdentity] = useState<MockIdentity | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [secretInput, setSecretInput] = useState("");
   const [manualChecked, setManualChecked] = useState(false);
   const [manualEligible, setManualEligible] = useState(false);
+  const [manualSnapshotMismatch, setManualSnapshotMismatch] = useState(false);
+  const [importedIdentities, setImportedIdentities] = useState<MockIdentity[]>([]);
 
   // Vote flow
   const [voteChoice, setVoteChoice] = useState<VoteChoice>(null);
@@ -58,17 +66,35 @@ export default function VotePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Pre-vote "already voted" detection (no proof needed).
-  const [hasVotedNullifier, setHasVotedNullifier] = useState<string | null>(null);
-  const [checkingVoted, setCheckingVoted] = useState(false);
+  const [voteCheck, setVoteCheck] = useState<{
+    identityIndex: number;
+    nullifier: string | null;
+  } | null>(null);
 
   // Anonymous voters list (nullifiers recorded on-chain for this proposal).
   const [voters, setVoters] = useState<string[]>([]);
 
+  const identity =
+    overrideIdentity ??
+    (connected && address && !advancedOpen ? walletIdentity : null);
+  const isEligible = !!identity;
+  const hasVotedNullifier =
+    identity && voteCheck?.identityIndex === identity.index
+      ? voteCheck.nullifier
+      : null;
+  const isCheckingVoted =
+    !!identity && voteCheck?.identityIndex !== identity.index;
+
+  const identityMatchesSnapshot =
+    !identity ||
+    !proposal?.merkleRoot ||
+    rootsMatch(identity.merkleProof.root, proposal.merkleRoot);
+
   useEffect(() => {
-    getProposal(proposalId).then((p) => {
-      setProposal(p);
-      setLoadingProposal(false);
-    });
+    fetch(`/api/proposals/${proposalId}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p: Proposal | null) => setProposal(p))
+      .finally(() => setLoadingProposal(false));
   }, [proposalId]);
 
   // Build the anonymous voters list: which snapshot nullifiers are recorded
@@ -76,6 +102,7 @@ export default function VotePage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const { isNullifierUsed } = await import("@/lib/stellar");
       const decs = await getNullifierColumn(proposalId);
       const checks = await Promise.all(
         decs.map(async (d) => ((await isNullifierUsed(d, proposalId)) ? d : null))
@@ -93,36 +120,34 @@ export default function VotePage() {
 
   // Resolve the connected wallet against the registered voter allowlist.
   useEffect(() => {
-    if (connected && address && !advancedOpen) {
-      getIdentityForAddress(address).then((id) => {
-        setIdentity(id);
-        setIsEligible(!!id);
-      });
-    } else if (!advancedOpen) {
-      setIdentity(null);
-      setIsEligible(false);
-    }
+    if (!connected || !address || advancedOpen) return;
+    let cancelled = false;
+    getIdentityForAddress(address).then((id) => {
+      if (!cancelled) setWalletIdentity(id);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [connected, address, advancedOpen]);
 
   // Detect whether this identity has already voted on this proposal, before
   // asking the user to generate a (slow) proof.
   useEffect(() => {
+    if (!identity) return;
+    const idx = identity.index;
     let cancelled = false;
-    if (!identity) {
-      setHasVotedNullifier(null);
-      return;
-    }
-    setCheckingVoted(true);
     (async () => {
+      const { isNullifierUsed } = await import("@/lib/stellar");
       const nf = await getNullifierFor(identity.index, proposalId);
       if (!nf) {
-        if (!cancelled) setCheckingVoted(false);
+        if (!cancelled) {
+          setVoteCheck({ identityIndex: idx, nullifier: null });
+        }
         return;
       }
       const used = await isNullifierUsed(nf, proposalId);
       if (!cancelled) {
-        setHasVotedNullifier(used ? nf : null);
-        setCheckingVoted(false);
+        setVoteCheck({ identityIndex: idx, nullifier: used ? nf : null });
       }
     })();
     return () => {
@@ -132,27 +157,56 @@ export default function VotePage() {
 
   const checkManualSecret = useCallback(async () => {
     if (!secretInput.trim()) return;
-    const found = await findIdentityBySecret(secretInput.trim());
+    const fromMock = await findIdentityBySecret(secretInput.trim());
+    const found =
+      fromMock ??
+      importedIdentities.find((i) => i.secretIdentity === secretInput.trim()) ??
+      null;
     setManualChecked(true);
+    setManualSnapshotMismatch(false);
+    if (found && proposal?.merkleRoot && !rootsMatch(found.merkleProof.root, proposal.merkleRoot)) {
+      setOverrideIdentity(null);
+      setManualEligible(false);
+      setManualSnapshotMismatch(true);
+      return;
+    }
     if (found) {
-      setIdentity(found);
-      setIsEligible(true);
+      setOverrideIdentity(found);
       setManualEligible(true);
     } else {
-      setIdentity(null);
-      setIsEligible(false);
+      setOverrideIdentity(null);
       setManualEligible(false);
     }
-  }, [secretInput]);
+  }, [secretInput, proposal, importedIdentities]);
+
+  const handleCredentialFile = useCallback(async (file: File | null) => {
+    if (!file) return;
+    try {
+      const parsed = parseVoterCredentialsJson(JSON.parse(await file.text()));
+      setImportedIdentities(parsed);
+    } catch {
+      setImportedIdentities([]);
+    }
+  }, []);
+
+  const loadDemoVoter = useCallback(async (index: number) => {
+    const id = await getMockIdentityAt(index);
+    setOverrideIdentity(id);
+    setAdvancedOpen(false);
+    setManualChecked(false);
+  }, []);
 
   const handleVote = useCallback(async () => {
-    if (!identity || voteChoice === null) return;
+    if (!identity || voteChoice === null || !identityMatchesSnapshot) return;
 
     setStep("proof");
     setProofStatus("loading_wasm");
     setErrorMsg(null);
 
     try {
+      const { generateVoteProof } = await import("@/lib/zkproof");
+      const { castVote, isNullifierUsed } = await import("@/lib/stellar");
+
       const { nullifier: nullifierStr, proofA, proofB, proofC } =
         await generateVoteProof(
           {
@@ -197,7 +251,7 @@ export default function VotePage() {
       setErrorMsg(msg);
       setStep("error");
     }
-  }, [identity, voteChoice, proposalId]);
+  }, [identity, voteChoice, proposalId, identityMatchesSnapshot]);
 
   const isVotingOpen = proposal ? isProposalActive(proposal) : false;
   const { total, yesPercent, noPercent } = proposal
@@ -284,9 +338,26 @@ export default function VotePage() {
             }
             mono
           />
-          <DetailRow label="Voting ends" value={`${endsAt} (${isVotingOpen ? timeRemaining(proposal.end_time) : "ended"})`} />
+          <DetailRow
+            label="Voting ends"
+            value={
+              isVotingOpen ? (
+                <>
+                  {endsAt} (
+                  <ClientTimeRemaining endTime={proposal.end_time} />)
+                </>
+              ) : (
+                `${endsAt} (ended)`
+              )
+            }
+          />
           <DetailRow label="Status" value={isVotingOpen ? "Voting" : "Closed"} last />
         </DetailTable>
+
+        {/* Turnout */}
+        <div className="mb-8">
+          <TurnoutMeter proposal={proposal} />
+        </div>
 
         {/* Results */}
         <HubSectionTitle>Results</HubSectionTitle>
@@ -301,7 +372,11 @@ export default function VotePage() {
           </MetricCard>
           <MetricCard label="Voting period">
             <p className="text-lg font-bold leading-tight">
-              {isVotingOpen ? timeRemaining(proposal.end_time) : "Ended"}
+              {isVotingOpen ? (
+                <ClientTimeRemaining endTime={proposal.end_time} />
+              ) : (
+                "Ended"
+              )}
             </p>
             <p className="text-xs text-gray-600 mt-1">Closes {endsAt}</p>
           </MetricCard>
@@ -319,19 +394,20 @@ export default function VotePage() {
               <p className="text-xs text-stellar-muted mb-1 uppercase tracking-widest">Voting ends</p>
               <p className="text-sm text-gray-200">{endsAt}</p>
               {isVotingOpen && (
-                <p className="text-xs text-stellar-cyan mt-1">{timeRemaining(proposal.end_time)}</p>
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  <ClientTimeRemaining endTime={proposal.end_time} />
+                </p>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 items-center mb-8">
-            <VoteDonutChart
+          <div className="mb-8">
+            <VoteProgressBar
               yesCount={proposal.yes_count}
               noCount={proposal.no_count}
-              size={180}
-              strokeWidth={22}
+              className="max-w-full"
             />
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mt-6">
               <VoteBreakdownCard label="Yes" percent={yesPercent} count={proposal.yes_count} color="yes" />
               <VoteBreakdownCard label="No" percent={noPercent} count={proposal.no_count} color="no" />
             </div>
@@ -348,6 +424,8 @@ export default function VotePage() {
           </div>
         ) : step === "success" ? (
           <SuccessCard
+            proposalId={proposalId}
+            proposalTitle={proposal.title}
             voteChoice={voteChoice}
             nullifier={nullifier}
             txHash={txHash}
@@ -402,6 +480,14 @@ export default function VotePage() {
                     {connecting ? "Connecting…" : "Connect Wallet to Check Eligibility"}
                   </button>
                 </>
+              ) : isEligible && identity && !identityMatchesSnapshot ? (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-rose-500/5 border border-rose-500/20">
+                  <span className="text-rose-400">✗</span>
+                  <p className="text-sm text-gray-300">
+                    This identity belongs to a different voter snapshot than this proposal.
+                    Use credentials from the proposal&apos;s snapshot file.
+                  </p>
+                </div>
               ) : isEligible && identity ? (
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-stellar-cyan/[0.06] border border-stellar-cyan/20">
                   <div className="w-9 h-9 rounded-full bg-stellar-cyan/15 border border-stellar-cyan/30 flex items-center justify-center shrink-0">
@@ -429,6 +515,29 @@ export default function VotePage() {
                 </div>
               )}
 
+              {/* Judge / tester demo — no wallet in snapshot required */}
+              <div className="mt-5 p-4 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)]">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+                  For judges &amp; testers
+                </p>
+                <p className="text-sm text-[var(--text-secondary)] mb-3 leading-relaxed">
+                  Your wallet does not need to be in the Merkle tree. Pick a demo voter
+                  slot to load a snapshot identity and run the full ZK vote flow.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {DEMO_VOTER_SLOTS.map((i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => loadDemoVoter(i)}
+                      className="btn btn-secondary text-xs py-2 px-3"
+                    >
+                      Demo voter #{i}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Advanced: enter a raw secret identity */}
               <button
                 onClick={() => setAdvancedOpen((v) => !v)}
@@ -446,7 +555,27 @@ export default function VotePage() {
               </button>
 
               {advancedOpen && (
-                <div className="mt-4 pt-4 border-t border-[#1c1f24]">
+                <div className="mt-4 pt-4 border-t border-[#1c1f24] space-y-4">
+                  <div>
+                    <p className="text-gray-500 text-xs mb-2">
+                      Import{" "}
+                      <span className="font-mono text-gray-400">voter-credentials.json</span>{" "}
+                      from your proposal submitter (custom snapshots).
+                    </p>
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      onChange={(e) => handleCredentialFile(e.target.files?.[0] ?? null)}
+                      className="text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[var(--surface-2)] file:text-gray-300"
+                    />
+                    {importedIdentities.length > 0 && (
+                      <p className="text-xs text-stellar-cyan mt-2">
+                        Loaded {importedIdentities.length} voter credential
+                        {importedIdentities.length !== 1 ? "s" : ""}.
+                      </p>
+                    )}
+                  </div>
+                  <div>
                   <p className="text-gray-500 text-xs mb-3">
                     Paste a <span className="font-mono text-gray-400">secretIdentity</span>{" "}
                     from the snapshot. This is the production-style flow where the
@@ -477,9 +606,12 @@ export default function VotePage() {
                     >
                       {manualEligible
                         ? `✓ Eligible — snapshot voter #${identity?.index}`
-                        : "✗ This secret is not in the snapshot."}
+                        : manualSnapshotMismatch
+                          ? "✗ Secret is valid but for a different proposal snapshot."
+                          : "✗ This secret is not in the snapshot."}
                     </p>
                   )}
+                  </div>
                 </div>
               )}
             </div>
@@ -520,7 +652,9 @@ export default function VotePage() {
             /* Step 2: Cast vote */
             <div
               className={`surface p-6 transition-all ${
-                isEligible && !checkingVoted ? "" : "opacity-50 pointer-events-none"
+                isEligible && !isCheckingVoted && identityMatchesSnapshot
+                  ? ""
+                  : "opacity-50 pointer-events-none"
               }`}
             >
               <StepHeader n={2} title="Cast your vote" />
@@ -662,14 +796,22 @@ function ProofProgress({
 }
 
 function SuccessCard({
+  proposalId,
+  proposalTitle,
   voteChoice,
   nullifier,
   txHash,
 }: {
+  proposalId: number;
+  proposalTitle: string;
   voteChoice: VoteChoice;
   nullifier: string | null;
   txHash: string | null;
 }) {
+  if (!nullifier || !txHash || voteChoice === null) {
+    return null;
+  }
+
   return (
     <div className="surface p-8 border-stellar-cyan/30">
       <div className="flex flex-col items-center text-center mb-6">
@@ -680,46 +822,20 @@ function SuccessCard({
         <p className="text-gray-400 text-sm">
           Your anonymous vote is on Stellar testnet.
         </p>
-        <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-stellar-cyan/10 border border-stellar-cyan/25">
-          <svg className="w-4 h-4 text-stellar-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l2.4 6.9H22l-6 4.3 2.3 7-6.3-4.5L5.7 20l2.3-7-6-4.3h7.6z" />
-          </svg>
-          <span className="text-xs text-gray-300">Proof-of-Vote collectible minted</span>
-        </div>
       </div>
 
-      <div className="space-y-3 text-sm">
-        <div className="surface-2 p-4">
-          <p className="text-gray-500 text-xs mb-1">Your vote</p>
-          <p className={`font-bold text-lg ${voteChoice === 1 ? "text-stellar-yes" : "text-stellar-no"}`}>
-            {voteChoice === 1 ? "Yes" : "No"}
-          </p>
-        </div>
-        {nullifier && (
-          <div className="surface-2 p-4">
-            <p className="text-gray-500 text-xs mb-1">Nullifier (your vote receipt)</p>
-            <p className="font-mono text-xs text-gray-300 break-all">{nullifier}</p>
-          </div>
-        )}
-        {txHash && (
-          <div className="surface-2 p-4">
-            <p className="text-gray-500 text-xs mb-1">Transaction</p>
-            <a
-              href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-xs text-stellar-cyan hover:underline break-all"
-            >
-              {txHash.slice(0, 20)}…{txHash.slice(-12)} ↗
-            </a>
-          </div>
-        )}
-      </div>
+      <PrivacyReceipt
+        data={{
+          proposalId,
+          proposalTitle,
+          voteLabel: voteChoice === 1 ? "Yes" : "No",
+          nullifier,
+          txHash,
+          votedAt: new Date().toLocaleString(),
+        }}
+      />
 
       <div className="flex gap-3 mt-6">
-        <Link href="/verify" className="btn btn-ghost flex-1 py-2.5 text-sm">
-          Verify Nullifier
-        </Link>
         <Link href="/proposals" className="btn btn-primary flex-1 py-2.5 text-sm">
           All Proposals
         </Link>

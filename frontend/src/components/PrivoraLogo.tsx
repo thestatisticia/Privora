@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useIsClient } from "@/lib/use-client";
 
 type Size = "sm" | "md" | "lg";
 
@@ -61,8 +61,7 @@ export default function PrivoraLogo({
   className = "",
   href = "/",
 }: Props) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsClient();
 
   const inner = (
     <>

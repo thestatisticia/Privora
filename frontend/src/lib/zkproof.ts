@@ -4,31 +4,11 @@
  * Runs in the browser — no server required.
  */
 
-export interface ProofInput {
-  secretIdentity: string;
-  pathElements: string[];
-  pathIndices: number[];
-  root: string;
-  proposalId: number;
-  vote: number; // 0 = No, 1 = Yes
-}
+import { nullifierToBytes32 } from "./nullifier";
+import type { ProofInput, GeneratedProof, ProofStatus } from "./types/zkproof";
 
-export interface GeneratedProof {
-  proof: object;
-  publicSignals: string[];
-  nullifier: string;
-  // Soroban BLS12-381 uncompressed encodings (hex, no 0x prefix)
-  proofA: string; // G1, 96 bytes
-  proofB: string; // G2, 192 bytes
-  proofC: string; // G1, 96 bytes
-}
-
-export type ProofStatus =
-  | "idle"
-  | "loading_wasm"
-  | "generating"
-  | "done"
-  | "error";
+export { nullifierToBytes32 };
+export type { ProofInput, GeneratedProof, ProofStatus } from "./types/zkproof";
 
 /**
  * Generate a Groth16 ZK proof for the vote circuit.
@@ -40,7 +20,7 @@ export async function generateVoteProof(
 ): Promise<GeneratedProof> {
   onStatus?.("loading_wasm");
 
-  // @ts-ignore
+  // @ts-expect-error snarkjs has no bundled types
   const snarkjs = await import("snarkjs");
 
   onStatus?.("generating");
@@ -90,12 +70,4 @@ function g1ToHex(p: string[]): string {
  */
 function g2ToHex(p: string[][]): string {
   return be48(p[0][1]) + be48(p[0][0]) + be48(p[1][1]) + be48(p[1][0]);
-}
-
-/**
- * Convert a nullifier (decimal string from snarkjs) to a 32-byte hex BytesN<32>
- * compatible with the Soroban contract.
- */
-export function nullifierToBytes32(nullifier: string): string {
-  return BigInt(nullifier).toString(16).padStart(64, "0");
 }

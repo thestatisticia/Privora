@@ -27,12 +27,19 @@ const SIM_SOURCE =
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+let rpcInstance: StellarSdk.rpc.Server | null = null;
+let contractInstance: StellarSdk.Contract | null = null;
+
 function getRpc() {
-  return new StellarSdk.rpc.Server(RPC_URL);
+  if (!rpcInstance) rpcInstance = new StellarSdk.rpc.Server(RPC_URL);
+  return rpcInstance;
 }
 
 function getContract() {
-  return new StellarSdk.Contract(CONTRACT_ID);
+  if (!contractInstance && CONTRACT_ID) {
+    contractInstance = new StellarSdk.Contract(CONTRACT_ID);
+  }
+  return contractInstance!;
 }
 
 /** Decode a Soroban ScVal struct into a plain Proposal object */
@@ -63,9 +70,26 @@ function decodeProposal(scval: StellarSdk.xdr.ScVal): Proposal {
     yes_count: Number(get("yes_count").u32()),
     no_count: Number(get("no_count").u32()),
     end_time: Number(get("end_time").u64()),
-    is_active: get("is_active").b() || false,
+    is_active: get("is_active").b() ?? false,
     merkleRoot,
   };
+}
+
+/** Soroban Option&lt;Proposal&gt; is returned as a map (Some) or void (None). */
+function proposalFromScVal(val: StellarSdk.xdr.ScVal): Proposal | null {
+  switch (val.switch().name) {
+    case "scvVoid":
+      return null;
+    case "scvMap":
+      return decodeProposal(val);
+    case "scvVec": {
+      const items = val.vec();
+      if (!items?.length) return null;
+      return decodeProposal(items[0]);
+    }
+    default:
+      return null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,20 +99,8 @@ function decodeProposal(scval: StellarSdk.xdr.ScVal): Proposal {
 export async function getProposalCount(): Promise<number> {
   if (!CONTRACT_ID) return MOCK_PROPOSALS.length;
   try {
-    const rpc = getRpc();
-    const contract = getContract();
-    const result = await rpc.simulateTransaction(
-      new StellarSdk.TransactionBuilder(
-        new StellarSdk.Account(SIM_SOURCE, "0"),
-        { fee: "100", networkPassphrase: NETWORK_PASSPHRASE }
-      )
-        .addOperation(contract.call("get_proposal_count"))
-        .setTimeout(30)
-        .build()
-    );
-    if (StellarSdk.rpc.Api.isSimulationSuccess(result)) {
-      return Number(StellarSdk.scValToNative(result.result!.retval));
-    }
+    const retval = await simulateCall("get_proposal_count");
+    if (retval) return Number(StellarSdk.scValToNative(retval));
   } catch {
     /* fall through to mock */
   }
@@ -98,40 +110,25 @@ export async function getProposalCount(): Promise<number> {
 export async function getProposal(id: number): Promise<Proposal | null> {
   if (!CONTRACT_ID) return MOCK_PROPOSALS[id] || null;
   try {
-    const rpc = getRpc();
-    const contract = getContract();
-    const result = await rpc.simulateTransaction(
-      new StellarSdk.TransactionBuilder(
-        new StellarSdk.Account(SIM_SOURCE, "0"),
-        { fee: "100", networkPassphrase: NETWORK_PASSPHRASE }
-      )
-        .addOperation(
-          contract.call("get_proposal", StellarSdk.nativeToScVal(id, { type: "u32" }))
-        )
-        .setTimeout(30)
-        .build()
+    const retval = await simulateCall(
+      "get_proposal",
+      StellarSdk.nativeToScVal(id, { type: "u32" })
     );
-    if (StellarSdk.rpc.Api.isSimulationSuccess(result)) {
-      const val = result.result!.retval;
-      if (val.switch().name === "scvVoid") return null;
-      return decodeProposal(val.vec()![0]);
-    }
-  } catch {
-    /* fall through to mock */
+    if (retval) return proposalFromScVal(retval);
+  } catch (err) {
+    console.error(`getProposal(${id}) failed:`, err);
   }
-  return MOCK_PROPOSALS[id] || null;
+  return null;
 }
 
 export async function getAllProposals(): Promise<Proposal[]> {
   if (!CONTRACT_ID) return [...MOCK_PROPOSALS];
   try {
     const count = await getProposalCount();
-    const proposals: Proposal[] = [];
-    for (let i = 0; i < count; i++) {
-      const p = await getProposal(i);
-      if (p) proposals.push(p);
-    }
-    return proposals;
+    const results = await Promise.all(
+      Array.from({ length: count }, (_, i) => getProposal(i))
+    );
+    return results.filter((p): p is Proposal => p !== null);
   } catch {
     return [...MOCK_PROPOSALS];
   }

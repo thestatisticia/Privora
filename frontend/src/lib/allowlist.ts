@@ -10,10 +10,10 @@ export interface AllowlistEntry {
   secret?: string;
 }
 
-/** Contract admin — only this wallet may access the review queue in the UI. */
+/** Privora admin / reviewer wallet — can approve submissions in the UI. */
 export const ADMIN_WALLET =
   process.env.NEXT_PUBLIC_ADMIN_WALLET ||
-  "GC3EQN3BGV46IG7B7JGQTDTOAUPOIPMSY3G7AVBWMCHL5M2BSTADBEHD";
+  "GDCYHMPLBJCLSVKJWVYYSWDUDHUCAUV7Y2CWFE67XTCW35EG47QM276X";
 
 export const ALLOWLIST: AllowlistEntry[] = [
   {
@@ -61,4 +61,9 @@ export function isProposer(address: string | null): boolean {
 
 export function isAdmin(address: string | null): boolean {
   return !!address && address === ADMIN_WALLET;
+}
+
+/** Matches on-chain `require_reviewer`: admin or authorized proposer. */
+export function isReviewer(address: string | null): boolean {
+  return isAdmin(address) || isProposer(address);
 }

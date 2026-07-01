@@ -9,6 +9,7 @@ export interface MockIdentity {
   secretIdentity: string;
   secretIdentityHex: string;
   leaf: string;
+  label?: string;
   merkleProof: {
     pathElements: string[];
     pathIndices: number[];

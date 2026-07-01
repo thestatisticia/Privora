@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { WalletProvider } from "@/lib/wallet";
-import { ThemeProvider } from "@/lib/theme";
-import AppShell from "@/components/AppShell";
+import Providers from "@/components/Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -47,11 +45,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${display.variable} ${inter.variable} antialiased bg-stellar-base text-[var(--foreground)]`}>
-        <ThemeProvider>
-          <WalletProvider>
-            <AppShell>{children}</AppShell>
-          </WalletProvider>
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

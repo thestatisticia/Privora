@@ -133,10 +133,16 @@ export default function VoteDonutChart({
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-2xl font-bold text-white tabular-nums">{total}</span>
-          <span className="text-[10px] uppercase tracking-widest text-stellar-muted">
-            votes
+          <span
+            className={`font-bold text-white tabular-nums ${size < 56 ? "text-sm" : "text-2xl"}`}
+          >
+            {total}
           </span>
+          {size >= 56 && (
+            <span className="text-[10px] uppercase tracking-widest text-stellar-muted">
+              votes
+            </span>
+          )}
         </div>
       </div>
 

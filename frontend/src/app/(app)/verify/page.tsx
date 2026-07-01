@@ -1,22 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import { isNullifierUsed } from "@/lib/stellar";
+import { useEffect, useState } from "react";
 import { HubPage } from "@/components/hub/HubPage";
 
 export default function VerifyPage() {
-  const [nullifierInput, setNullifierInput] = useState("");
-  const [proposalInput, setProposalInput] = useState("0");
+  const [nullifierInput, setNullifierInput] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("nullifier") ?? "";
+  });
+  const [proposalInput, setProposalInput] = useState(() => {
+    if (typeof window === "undefined") return "0";
+    return new URLSearchParams(window.location.search).get("proposalId") ?? "0";
+  });
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<"found" | "not_found" | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nf = params.get("nullifier");
+    const pid = params.get("proposalId");
+    if (!nf || !pid) return;
+    const q = new URLSearchParams({ nullifier: nf, proposalId: pid });
+    fetch(`/api/nullifier?${q}`)
+      .then((r) => r.json())
+      .then((data) => setResult(data.used ? "found" : "not_found"))
+      .catch(() => setResult("not_found"));
+  }, []);
 
   const handleCheck = async () => {
     if (!nullifierInput.trim()) return;
     setChecking(true);
     setResult(null);
     try {
-      const used = await isNullifierUsed(nullifierInput.trim(), Number(proposalInput));
-      setResult(used ? "found" : "not_found");
+      const q = new URLSearchParams({
+        nullifier: nullifierInput.trim(),
+        proposalId: proposalInput,
+      });
+      const r = await fetch(`/api/nullifier?${q}`);
+      const data = await r.json();
+      setResult(data.used ? "found" : "not_found");
     } catch {
       setResult("not_found");
     } finally {

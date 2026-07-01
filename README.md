@@ -21,6 +21,23 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## How judges can test voting
+
+Voters prove membership in a **Merkle snapshot** — not every wallet is eligible by default.
+
+**Option A — Demo voter (fastest, no wallet setup)**  
+1. Open any live proposal  
+2. Under **For judges & testers**, click **Demo voter #2** (or #3, #4)  
+3. Choose Yes or No → generate proof → vote  
+
+Each demo slot is a pre-registered snapshot identity. The vote is fully anonymous on-chain.
+
+**Option B — Allowlist a judge wallet**  
+Add the judge's Stellar address to `frontend/src/lib/allowlist.ts` in `ALLOWLIST`, mapped to a free snapshot index (1–15). They connect Freighter and vote normally.
+
+**Option C — Manual secret**  
+Expand **Advanced: use a specific secret identity** and paste a `secretIdentity` from `mock_identities.json`.
+
 ## Deploy to Vercel
 
 1. Import [github.com/thestatisticia/Privora](https://github.com/thestatisticia/Privora) in Vercel

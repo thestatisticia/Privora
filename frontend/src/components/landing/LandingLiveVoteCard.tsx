@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Proposal } from "@/lib/types/proposal";
 import { votePercents } from "@/lib/proposal-utils";
+import { useIsClient } from "@/lib/use-client";
 
 const FALLBACK: Proposal = {
   id: 0,
@@ -19,9 +20,7 @@ const FALLBACK: Proposal = {
 export default function LandingLiveVoteCard() {
   const [proposal, setProposal] = useState<Proposal>(FALLBACK);
   const [hover, setHover] = useState<"yes" | "no" | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsClient();
 
   useEffect(() => {
     if (!mounted) return;

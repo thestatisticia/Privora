@@ -7,4 +7,6 @@ export interface Proposal {
   end_time: number;
   is_active: boolean;
   merkleRoot?: string;
+  /** Eligible voters in the snapshot (from registry). */
+  snapshotVoterCount?: number | null;
 }
