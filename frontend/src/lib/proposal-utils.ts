@@ -4,6 +4,15 @@ export function isProposalActive(proposal: Proposal): boolean {
   return proposal.is_active && Math.floor(Date.now() / 1000) < proposal.end_time;
 }
 
+/** Drop past-deadline proposals when newer active rounds exist. */
+export function getDisplayProposals(proposals: Proposal[]): Proposal[] {
+  const active = proposals.filter(isProposalActive);
+  if (active.length > 0) {
+    return [...active].sort((a, b) => b.id - a.id);
+  }
+  return [...proposals].sort((a, b) => b.id - a.id);
+}
+
 export function timeRemaining(endTime: number): string {
   const diff = endTime - Math.floor(Date.now() / 1000);
   if (diff <= 0) return "Ended";

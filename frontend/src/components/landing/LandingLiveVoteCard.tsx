@@ -27,7 +27,7 @@ export default function LandingLiveVoteCard() {
     fetch("/api/proposals")
       .then((r) => (r.ok ? r.json() : []))
       .then((list: Proposal[]) => {
-        const active = list.filter((p) => p.is_active);
+        const active = list.filter((p) => p.is_active && Date.now() / 1000 < p.end_time);
         const picked = active[0] ?? list[0];
         if (picked) setProposal(picked);
       })

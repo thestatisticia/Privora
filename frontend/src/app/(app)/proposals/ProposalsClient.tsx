@@ -16,8 +16,6 @@ import {
 } from "@/lib/proposal-utils";
 import LiveActivityFeed from "@/components/LiveActivityFeed";
 
-type Filter = "all" | "voting" | "ended";
-
 async function fetchProposals(): Promise<Proposal[]> {
   const r = await fetch("/api/proposals");
   if (!r.ok) return [];
@@ -35,7 +33,6 @@ export default function ProposalsClient({
   const [refreshing, setRefreshing] = useState(false);
   const [renewing, setRenewing] = useState(false);
   const [renewMsg, setRenewMsg] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -48,13 +45,6 @@ export default function ProposalsClient({
       setRefreshing(false);
     }
   }, []);
-
-  const filtered = proposals.filter((p) => {
-    const active = isProposalActive(p);
-    if (filter === "voting") return active;
-    if (filter === "ended") return !active;
-    return true;
-  });
 
   const votingCount = proposals.filter(isProposalActive).length;
   const totalVotes = proposals.reduce((a, p) => a + p.yes_count + p.no_count, 0);
@@ -147,25 +137,6 @@ export default function ProposalsClient({
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-8 mb-8">
         <div className="min-w-0">
       <div className="flex gap-2 mb-8 border-b border-[var(--border-subtle)] pb-4">
-        {(
-          [
-            ["all", "All"],
-            ["voting", "Voting"],
-            ["ended", "Ended"],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              filter === key
-                ? "bg-[var(--surface-2)] text-[var(--foreground)] border border-[var(--border-strong)]"
-                : "text-[var(--muted)] hover:text-[var(--foreground)] border border-transparent"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
         {refreshing && (
           <span className="ml-auto text-xs text-[var(--muted)] self-center tabular-nums">
             Syncing…
@@ -183,13 +154,13 @@ export default function ProposalsClient({
           <span className="text-right">Turnout · Ends</span>
         </div>
 
-        {filtered.length === 0 ? (
+        {proposals.length === 0 ? (
           <div className="py-16 text-center text-[var(--muted)] text-sm">
-            No proposals match this filter.
+            No open proposals right now.
           </div>
         ) : (
           <div className="divide-y divide-[var(--border-subtle)]">
-            {filtered.map((p) => (
+            {proposals.map((p) => (
               <ProposalRow key={p.id} proposal={p} />
             ))}
           </div>
