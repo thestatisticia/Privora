@@ -158,8 +158,10 @@ export default function RewardsPage() {
             </div>
           ) : displayEligible === false ? (
             <div className="surface p-10 text-center text-[var(--muted)] text-sm">
-              This wallet isn&apos;t in the voter snapshot, so it has no
-              collectibles. Use demo voters on a proposal page to test voting.
+              This wallet isn&apos;t in the platform snapshot. Import voter credentials
+              from your organizer, or use{" "}
+              <span className="font-mono text-[var(--foreground)]">?demo=1</span> on a
+              proposal to test.
             </div>
           ) : loadingMine ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

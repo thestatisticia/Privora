@@ -17,7 +17,6 @@ const NETWORK_PASSPHRASE =
 const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL ||
   "https://soroban-testnet.stellar.org";
-const RELAYER_SECRET = process.env.NEXT_PUBLIC_RELAYER_SECRET || "";
 const DEFAULT_ROOT = process.env.NEXT_PUBLIC_MERKLE_ROOT || "";
 const SIM_SOURCE =
   process.env.NEXT_PUBLIC_RELAYER_PUBLIC ||
@@ -196,10 +195,8 @@ export async function isNullifierUsed(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Cast a FULLY ANONYMOUS vote. The transaction is signed and paid for by a
- * shared relayer account, so no voter wallet is ever recorded on-chain — the
- * vote is linked only to its anonymous nullifier. The choice itself stays
- * hidden inside the zero-knowledge proof.
+ * Cast a wallet-unlinked vote via the server relayer. The voter never signs;
+ * only the proof, nullifier, and tally hit Soroban.
  */
 export async function castVote(params: {
   proofA: string;
@@ -209,65 +206,19 @@ export async function castVote(params: {
   vote: number;
   proposalId: number;
 }): Promise<string> {
-  if (!RELAYER_SECRET) {
-    throw new Error("Relayer is not configured (NEXT_PUBLIC_RELAYER_SECRET).");
+  const res = await fetch("/api/cast-vote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const data = (await res.json()) as { txHash?: string; error?: string };
+  if (!res.ok) {
+    throw new Error(data.error || "Failed to relay vote");
   }
-
-  const rpc = getRpc();
-  const contract = getContract();
-  const relayer = StellarSdk.Keypair.fromSecret(RELAYER_SECRET);
-  const account = await rpc.getAccount(relayer.publicKey());
-
-  const nullifierBuf = Buffer.from(params.nullifierHex.padStart(64, "0"), "hex");
-  const proofABuf = Buffer.from(params.proofA, "hex"); // G1, 96 bytes
-  const proofBBuf = Buffer.from(params.proofB, "hex"); // G2, 192 bytes
-  const proofCBuf = Buffer.from(params.proofC, "hex"); // G1, 96 bytes
-
-  const tx = new StellarSdk.TransactionBuilder(account, {
-    fee: "10000000",
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(
-      contract.call(
-        "cast_vote",
-        StellarSdk.nativeToScVal(proofABuf, { type: "bytes" }),
-        StellarSdk.nativeToScVal(proofBBuf, { type: "bytes" }),
-        StellarSdk.nativeToScVal(proofCBuf, { type: "bytes" }),
-        StellarSdk.nativeToScVal(nullifierBuf, { type: "bytes" }),
-        StellarSdk.nativeToScVal(params.vote, { type: "u32" }),
-        StellarSdk.nativeToScVal(params.proposalId, { type: "u32" })
-      )
-    )
-    .setTimeout(30)
-    .build();
-
-  const simResult = await rpc.simulateTransaction(tx);
-  if (!StellarSdk.rpc.Api.isSimulationSuccess(simResult)) {
-    throw new Error(`Simulation failed: ${JSON.stringify(simResult)}`);
+  if (!data.txHash) {
+    throw new Error("Relay succeeded but no transaction hash returned");
   }
-  const preparedTx = StellarSdk.rpc.assembleTransaction(tx, simResult).build();
-
-  // The relayer signs — not the voter. This is the heart of vote privacy.
-  preparedTx.sign(relayer);
-
-  const submitResult = await rpc.sendTransaction(preparedTx);
-  if (submitResult.status === "ERROR") {
-    throw new Error(`Transaction failed: ${JSON.stringify(submitResult.errorResult)}`);
-  }
-
-  let getResult = await rpc.getTransaction(submitResult.hash);
-  let retries = 0;
-  while (getResult.status === "NOT_FOUND" && retries < 20) {
-    await new Promise((r) => setTimeout(r, 1000));
-    getResult = await rpc.getTransaction(submitResult.hash);
-    retries++;
-  }
-
-  if (getResult.status !== "SUCCESS") {
-    throw new Error(`Transaction ${submitResult.hash} did not confirm`);
-  }
-
-  return submitResult.hash;
+  return data.txHash;
 }
 
 /**

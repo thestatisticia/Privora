@@ -56,29 +56,17 @@ export async function getRandomMockIdentity(): Promise<MockIdentity> {
 }
 
 /**
- * Look up the snapshot identity for a registered wallet on a specific proposal.
- * Custom snapshots: wallet list from registry + deterministic secrets.
- * Platform snapshot: allowlist + mock_identities.json.
+ * Look up the snapshot identity for a registered wallet (platform snapshot only).
+ * Custom snapshots use privately distributed voter-credentials.json — wallets are
+ * never stored server-side.
  */
 export async function getIdentityForAddress(
   address: string,
   merkleRoot?: string
 ): Promise<MockIdentity | null> {
-  const { isPlatformRoot, resolveWalletInSnapshot } = await import("./snapshot-builder");
+  const { isPlatformRoot } = await import("./snapshot-builder");
 
   if (merkleRoot && !isPlatformRoot(merkleRoot)) {
-    try {
-      const q = new URLSearchParams({ root: merkleRoot });
-      const res = await fetch(`/api/snapshots?${q}`);
-      if (res.ok) {
-        const meta = (await res.json()) as { wallets?: string[] };
-        if (meta.wallets?.includes(address)) {
-          return resolveWalletInSnapshot(address, meta.wallets, merkleRoot);
-        }
-      }
-    } catch {
-      /* fall through */
-    }
     return null;
   }
 

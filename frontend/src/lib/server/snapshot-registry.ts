@@ -62,7 +62,7 @@ async function saveRegistry(registry: Registry) {
 }
 
 export async function registerSnapshot(
-  meta: Omit<SnapshotMeta, "createdAt"> & { wallets?: string[] }
+  meta: Omit<SnapshotMeta, "createdAt">
 ): Promise<SnapshotMeta> {
   const registry = await ensureRegistry();
   const key = normalizeRootToDecimal(meta.merkleRootDecimal);
@@ -70,7 +70,6 @@ export async function registerSnapshot(
     ...meta,
     merkleRootDecimal: key,
     merkleRootHex: meta.merkleRootHex.replace(/^0x/i, "").padStart(64, "0"),
-    wallets: meta.wallets,
     createdAt: new Date().toISOString(),
   };
   registry[key] = entry;

@@ -37,7 +37,6 @@ function parseWalletLines(text: string): { valid: string[]; invalid: string[] } 
 
 async function registerSnapshot(
   snapshot: BuiltSnapshot,
-  wallets: string[],
   label?: string
 ): Promise<void> {
   await fetch("/api/snapshots", {
@@ -47,7 +46,6 @@ async function registerSnapshot(
       merkleRootDecimal: snapshot.root,
       merkleRootHex: snapshot.rootHex,
       voterCount: snapshot.voterCount,
-      wallets,
       label,
     }),
   });
@@ -79,7 +77,7 @@ export function useSnapshotSelection() {
     setBuildError(null);
     try {
       const snapshot = await buildSnapshotFromWallets(parsed.valid);
-      await registerSnapshot(snapshot, parsed.valid, "Custom proposal snapshot");
+      await registerSnapshot(snapshot, "Custom proposal snapshot");
       setCustomSnapshot(snapshot);
     } catch (err) {
       setBuildError(err instanceof Error ? err.message : "Failed to build snapshot");
@@ -141,10 +139,10 @@ export function SnapshotBuilderPanel(props: ReturnType<typeof useSnapshotSelecti
         </p>
         <h2 className="text-lg font-semibold mb-2">Eligible voter snapshot</h2>
         <p className="text-sm text-gray-400 leading-relaxed">
-          Paste the <strong className="text-gray-300">Stellar wallet addresses</strong> allowed
-          to vote. Privora builds a Merkle tree and stores the root on-chain. Listed wallets
-          can connect Freighter on the vote page and are recognized automatically — no copy/paste
-          required.
+          Paste eligible <strong className="text-gray-300">Stellar wallet addresses</strong> to
+          build a Poseidon Merkle tree. Only the root goes on-chain — download{" "}
+          <span className="font-mono text-gray-300">voter-credentials.json</span> and distribute it
+          privately to voters. Wallet addresses are never stored on Privora servers.
         </p>
       </div>
 
@@ -267,10 +265,10 @@ export function SnapshotBuilderPanel(props: ReturnType<typeof useSnapshotSelecti
                 0x{customSnapshot.rootHex}
               </p>
               <div className="text-xs text-gray-400 space-y-1.5 border-t border-stellar-cyan/10 pt-3">
-                <p className="font-medium text-gray-300">After approval:</p>
+                <p className="font-medium text-gray-300">Distribute credentials privately:</p>
                 <p className="text-gray-500">
-                  Wallets on this list connect Freighter on the vote page — eligibility is
-                  automatic. The credentials file is optional backup for auditors.
+                  Send each voter their entry from the credentials file (Signal, email, etc.).
+                  They import it on the vote page — Privora never stores wallet lists.
                 </p>
               </div>
               <button
@@ -278,16 +276,16 @@ export function SnapshotBuilderPanel(props: ReturnType<typeof useSnapshotSelecti
                 onClick={() => downloadSnapshotBundle(customSnapshot)}
                 className="btn btn-secondary w-full py-2.5 text-sm"
               >
-                Download voter credentials (.json) — optional
+                Download voter credentials (.json)
               </button>
             </div>
           )}
         </div>
       ) : (
         <div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border-subtle)] text-sm text-gray-400">
-          Uses the shared Privora demo tree ({PLATFORM_VOTER_COUNT} voters). Judges can use{" "}
-          <span className="text-gray-300">Demo voter #1–4</span> on the vote page — no wallet
-          list needed.
+          Uses the shared Privora platform Merkle tree ({PLATFORM_VOTER_COUNT} voters).
+          Allowlisted wallets connect Freighter; judges append{" "}
+          <span className="font-mono text-gray-300">?demo=1</span> to test without a wallet.
         </div>
       )}
 

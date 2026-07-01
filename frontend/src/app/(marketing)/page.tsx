@@ -9,9 +9,9 @@ const LandingLiveVoteCard = dynamic(
 
 const BENEFITS = [
   {
-    tag: "Privacy",
-    title: "Anonymous eligibility",
-    desc: "Prove you're in the voter snapshot with a Merkle proof. Your wallet never appears on the ballot.",
+    tag: "Stellar",
+    title: "Soroban-native ZK",
+    desc: "Groth16 verified on-chain via BLS12-381 host functions — not an L2 bolt-on, built for Stellar.",
     icon: (
       <path
         strokeLinecap="round"
@@ -22,9 +22,9 @@ const BENEFITS = [
     ),
   },
   {
-    tag: "Integrity",
-    title: "One vote enforced",
-    desc: "Nullifiers on Soroban block double-voting. One identity, one ballot — enforced by math, not trust.",
+    tag: "Privacy",
+    title: "Wallet-unlinked ballots",
+    desc: "Prove Merkle eligibility in zero knowledge. Your Freighter wallet never signs the vote transaction.",
     icon: (
       <path
         strokeLinecap="round"
@@ -35,9 +35,9 @@ const BENEFITS = [
     ),
   },
   {
-    tag: "Audit",
-    title: "Fully verifiable",
-    desc: "Groth16 proofs verified on-chain. Anyone can audit tallies and nullifiers without seeing who voted how.",
+    tag: "Integrity",
+    title: "One vote enforced",
+    desc: "Poseidon nullifiers on Soroban block double-voting. One identity, one ballot — enforced by math.",
     icon: (
       <path
         strokeLinecap="round"
@@ -52,25 +52,25 @@ const BENEFITS = [
 const FLOW_STEPS = [
   {
     n: "01",
-    title: "Connect wallet",
-    desc: "Link Freighter to check your address against the voter snapshot. Eligibility only — no vote is cast yet.",
+    title: "Prove eligibility",
+    desc: "Import voter credentials or connect an allowlisted wallet. Merkle membership is proven — not your ballot.",
   },
   {
     n: "02",
     title: "Generate proof",
-    desc: "Privora builds a Groth16 proof locally in your browser. Your secret identity never leaves the device.",
+    desc: "Groth16 runs locally in your browser. Secret identity and Merkle path never leave the device.",
   },
   {
     n: "03",
-    title: "Cast vote",
-    desc: "The proof is relayed to Soroban anonymously. On-chain: a nullifier and tally update — not your wallet.",
+    title: "Relay to Soroban",
+    desc: "A server relayer signs cast_vote on Stellar testnet. On-chain: nullifier + tally — not your wallet.",
   },
 ] as const;
 
 const STATS = [
   { label: "Proof system", value: "Groth16" },
-  { label: "Ballot privacy", value: "100%" },
-  { label: "Network", value: "Soroban" },
+  { label: "Chain", value: "Soroban" },
+  { label: "Wallet link", value: "None" },
 ] as const;
 
 export default function Home() {
@@ -93,13 +93,13 @@ export default function Home() {
               </h1>
 
               <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed mb-4 max-w-xl mx-auto lg:mx-0">
-                Vote with Merkle proofs and nullifiers on Soroban. Prove you&apos;re
-                eligible without revealing who you are or how you voted.
+                Groth16 on Soroban: prove Merkle eligibility, cast via relayer, enforce
+                one vote per nullifier. Your Stellar wallet never signs the ballot.
               </p>
 
               <p className="text-sm text-[var(--muted)] mb-8 max-w-lg mx-auto lg:mx-0">
-                Zero-knowledge ballots for DAOs and token-gated communities — verifiable,
-                private, and live on testnet today.
+                ZK governance for Stellar DAOs — identity unlinked on-chain, tallies
+                verifiable by anyone.
               </p>
 
               <div className="relative z-10 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-8">
@@ -205,7 +205,7 @@ export default function Home() {
             <p className="text-sm md:text-base text-[var(--text-secondary)] leading-relaxed mb-4">
               DAOs need voting that is both <strong className="text-[var(--foreground)] font-medium">verifiable</strong> and{" "}
               <strong className="text-[var(--foreground)] font-medium">private</strong>.
-              Members prove eligibility without exposing wallets or choices.
+              Members prove Merkle eligibility on Soroban — wallets unlinked from ballots.
             </p>
             <p className="text-sm text-[var(--muted)]">
               Token-gated communities, grant programs, and protocol upgrades can all run

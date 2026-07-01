@@ -94,8 +94,8 @@ export default function ProposalsClient({
           <Link href="/create" className="btn btn-primary px-6 py-3 text-sm" prefetch>
             New Proposal
           </Link>
-          <p className="w-full lg:w-auto text-[10px] text-[var(--muted)] lg:max-w-[140px] leading-snug lg:text-right">
-            Submit at /create — paste eligible Stellar wallets to build the voter Merkle tree
+          <p className="w-full lg:w-auto text-[10px] text-[var(--muted)] lg:max-w-[160px] leading-snug lg:text-right">
+            Submit at /create — build a Merkle snapshot; distribute credentials privately
           </p>
         </div>
       </div>

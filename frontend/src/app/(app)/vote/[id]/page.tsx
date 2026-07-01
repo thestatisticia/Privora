@@ -32,6 +32,7 @@ import {
   isProposalActive,
   votePercents,
 } from "@/lib/proposal-utils";
+import { useDemoMode } from "@/lib/use-demo-mode";
 
 const DEMO_VOTER_SLOTS = [1, 2, 3, 4] as const;
 
@@ -42,6 +43,7 @@ export default function VotePage() {
   const params = useParams();
   const proposalId = Number(params.id);
   const { address, connected, connecting, connect } = useWallet();
+  const demoMode = useDemoMode();
 
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -334,8 +336,8 @@ export default function VotePage() {
               you oppose this proposal.
             </li>
             <li className="flex gap-3 text-gray-500">
-              <span className="text-gray-400 font-semibold shrink-0">Private</span>
-              your choice stays inside the zero-knowledge proof — only the tally is public.
+              <span className="text-gray-400 font-semibold shrink-0">Unlinked</span>
+              your Stellar wallet never signs the ballot — a Soroban relayer submits the proof.
             </li>
           </ul>
         </div>
@@ -525,19 +527,21 @@ export default function VotePage() {
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-rose-500/5 border border-rose-500/20">
                   <span className="text-rose-400">✗</span>
                   <p className="text-sm text-gray-300">
-                    This wallet is not in the snapshot.
+                    {proposal?.merkleRoot
+                      ? "Import voter-credentials.json from your organizer (Advanced below)."
+                      : "Connect an allowlisted wallet or import voter credentials."}
                   </p>
                 </div>
               )}
 
-              {/* Judge / tester demo — no wallet in snapshot required */}
+              {/* Judge / tester demo — hidden unless ?demo=1 */}
+              {demoMode && (
               <div className="mt-5 p-4 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)]">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
-                  For judges &amp; testers
+                  Demo mode
                 </p>
                 <p className="text-sm text-[var(--text-secondary)] mb-3 leading-relaxed">
-                  Your wallet does not need to be in the Merkle tree. Pick a demo voter
-                  slot to load a snapshot identity and run the full ZK vote flow.
+                  Load a pre-registered snapshot identity to test the full Groth16 → Soroban flow.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {DEMO_VOTER_SLOTS.map((i) => (
@@ -552,8 +556,9 @@ export default function VotePage() {
                   ))}
                 </div>
               </div>
+              )}
 
-              {/* Advanced: enter a raw secret identity */}
+              {/* Credential-based identity (production path for custom snapshots) */}
               <button
                 onClick={() => setAdvancedOpen((v) => !v)}
                 className="mt-4 text-xs text-gray-500 hover:text-gray-300 transition-colors inline-flex items-center gap-1.5"
@@ -566,7 +571,7 @@ export default function VotePage() {
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                Advanced: use a specific secret identity
+                Advanced: voter credentials
               </button>
 
               {advancedOpen && (

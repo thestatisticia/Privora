@@ -20,9 +20,8 @@ const PUBLIC_ROWS = [
 ];
 
 const PRIVATE_ROWS = [
-  "Your Stellar wallet",
+  "Your Stellar wallet (ballot tx)",
   "Secret identity & Merkle leaf",
-  "How you voted (Yes / No)",
   "Which snapshot voter you are",
 ];
 
