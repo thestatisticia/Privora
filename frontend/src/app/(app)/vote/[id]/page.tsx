@@ -652,10 +652,13 @@ export default function VotePage() {
                       Proof-of-Vote collectible has been minted.
                     </p>
                     <p className="text-gray-500 text-xs mt-3 mb-1">
-                      Your nullifier (vote receipt)
+                      Anonymous vote receipt
                     </p>
                     <p className="font-mono text-xs text-gray-300 break-all">
                       {hasVotedNullifier}
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-1">
+                      Nullifier ID — not linked to your wallet on-chain
                     </p>
                     <div className="flex gap-3 mt-4">
                       <Link href="/verify" className="btn btn-ghost px-4 py-2 text-sm">

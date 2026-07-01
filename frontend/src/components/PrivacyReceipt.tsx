@@ -14,7 +14,7 @@ export interface PrivacyReceiptData {
 
 const PUBLIC_ROWS = [
   "Yes / No tally updated",
-  "Nullifier recorded on Soroban",
+  "Anonymous vote receipt on Soroban",
   "Groth16 proof verified on-chain",
   "Proof-of-Vote collectible minted",
 ];
@@ -83,8 +83,11 @@ export default function PrivacyReceipt({ data }: { data: PrivacyReceiptData }) {
         </div>
 
         <div className="mb-3">
-          <p className="text-[10px] text-[var(--muted)] uppercase mb-1">Nullifier</p>
+          <p className="text-[10px] text-[var(--muted)] uppercase mb-1">Anonymous vote receipt</p>
           <p className="font-mono text-xs break-all text-[var(--text-secondary)]">{data.nullifier}</p>
+          <p className="text-[10px] text-[var(--muted)] mt-1.5">
+            Nullifier ID — proves you voted without revealing your wallet
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -93,7 +96,7 @@ export default function PrivacyReceipt({ data }: { data: PrivacyReceiptData }) {
             onClick={() => copy(data.nullifier, "nf")}
             className="btn btn-ghost text-xs py-2 px-3"
           >
-            {copied === "nf" ? "Copied" : "Copy nullifier"}
+            {copied === "nf" ? "Copied" : "Copy receipt ID"}
           </button>
           <button
             type="button"

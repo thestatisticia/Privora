@@ -1,6 +1,9 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import LandingVoteCardSkeleton from "@/components/landing/LandingVoteCardSkeleton";
+import HeroPillars from "@/components/landing/HeroPillars";
+import PrivacyComparison from "@/components/landing/PrivacyComparison";
+import WhyStellar from "@/components/landing/WhyStellar";
 
 const LandingLiveVoteCard = dynamic(
   () => import("@/components/landing/LandingLiveVoteCard"),
@@ -89,25 +92,26 @@ export default function Home() {
               </p>
 
               <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] xl:text-[3.5rem] font-semibold leading-[1.05] tracking-tight mb-5">
-                Anonymous voting on Stellar, powered by ZK proofs
+                Private governance for Stellar communities
               </h1>
 
+              <HeroPillars />
+
               <p className="text-base md:text-lg text-[var(--text-secondary)] leading-relaxed mb-4 max-w-xl mx-auto lg:mx-0">
-                Groth16 on Soroban: prove Merkle eligibility, cast via relayer, enforce
-                one vote per nullifier. Your Stellar wallet never signs the ballot.
+                Wallet-unlinked voting on Soroban: Groth16 proves Merkle eligibility in your
+                browser, a relayer submits the ballot, nullifiers prevent double-votes.
               </p>
 
               <p className="text-sm text-[var(--muted)] mb-8 max-w-lg mx-auto lg:mx-0">
-                ZK governance for Stellar DAOs — identity unlinked on-chain, tallies
-                verifiable by anyone.
+                Live on Stellar testnet — verify tallies and anonymous vote receipts on-chain.
               </p>
 
               <div className="relative z-10 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-8">
                 <Link href="/proposals" prefetch className="btn btn-primary px-7 py-3 text-sm">
                   Launch app
                 </Link>
-                <a href="#how-it-works" className="btn btn-secondary px-7 py-3 text-sm">
-                  How it works
+                <a href="#privacy-comparison" className="btn btn-secondary px-7 py-3 text-sm">
+                  See the difference
                 </a>
               </div>
 
@@ -133,7 +137,7 @@ export default function Home() {
           {[...Array(2)].map((_, i) => (
             <span key={i} className="inline-flex gap-12 shrink-0">
               <span>✓ Groth16 on-chain</span>
-              <span>✓ Nullifier receipts</span>
+              <span>✓ Anonymous vote receipts</span>
               <span>✓ Local proof generation</span>
               <span>✓ Relayer anonymity</span>
               <span>✓ Soroban verified</span>
@@ -141,6 +145,10 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <PrivacyComparison />
+
+      <WhyStellar />
 
       <section className="py-16 md:py-20 px-5 sm:px-8 lg:px-10">
         <div className="max-w-6xl mx-auto">
@@ -215,7 +223,7 @@ export default function Home() {
           <div className="surface p-8 text-center lg:text-left">
             <h3 className="text-lg font-semibold mb-2">Ready to try it?</h3>
             <p className="text-sm text-[var(--text-secondary)] mb-6">
-              Vote on a live proposal, verify nullifiers, or submit your own for review.
+              Vote on a live proposal, verify anonymous vote receipts, or submit your own for review.
             </p>
             <div className="relative z-10 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Link href="/proposals" prefetch className="btn btn-primary px-7 py-3 text-sm">
