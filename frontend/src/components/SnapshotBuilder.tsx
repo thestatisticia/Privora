@@ -156,8 +156,8 @@ export function SnapshotBuilderPanel(props: ReturnType<typeof useSnapshotSelecti
               : "bg-[#060708] border-[#1c1f24] text-gray-400 hover:border-stellar-cyan/30"
           }`}
         >
-          <span className="font-semibold block">My voter list</span>
-          <span className="text-xs opacity-80 mt-0.5">Paste eligible wallet addresses</span>
+          <span className="font-semibold block">Custom snapshot</span>
+          <span className="text-xs opacity-80 mt-0.5">Your voters → Merkle tree → credentials</span>
         </button>
         <button
           type="button"

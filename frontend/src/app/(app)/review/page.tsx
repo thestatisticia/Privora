@@ -183,7 +183,7 @@ export default function ReviewPage() {
         <div className="surface p-10 text-center text-gray-500 text-sm mb-10">
           <p>No pending submissions on-chain.</p>
           <p className="text-xs text-stellar-muted mt-2 max-w-md mx-auto">
-            New submissions appear here after someone uses Submit. They will not show on
+            New proposals appear here after someone uses <strong className="text-[var(--foreground)]">New proposal</strong>. They will not show on
             Proposals until you approve them.
           </p>
         </div>

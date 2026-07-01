@@ -32,7 +32,7 @@ function useNavGroups(): NavGroup[] {
       heading: "Governance",
       items: [
         { href: "/proposals", label: "Proposals", icon: <Icon d={ICONS.governance} /> },
-        { href: "/create", label: "Submit + voter list", icon: <Icon d={ICONS.submit} /> },
+        { href: "/create", label: "New proposal", icon: <Icon d={ICONS.submit} /> },
       ],
     },
     {

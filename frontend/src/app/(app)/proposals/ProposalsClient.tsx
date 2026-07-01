@@ -95,7 +95,7 @@ export default function ProposalsClient({
             New Proposal
           </Link>
           <p className="w-full lg:w-auto text-[10px] text-[var(--muted)] lg:max-w-[160px] leading-snug lg:text-right">
-            Submit at /create — build a Merkle snapshot; distribute credentials privately
+            New proposal — build a Merkle snapshot, then distribute credentials privately
           </p>
         </div>
       </div>

@@ -52,10 +52,10 @@ export default function SubmitProposalPage() {
     <HubPage>
       <HubBackLink href="/proposals" label="Proposals" />
 
-      <h1 className="text-3xl font-bold mb-2">Submit a proposal</h1>
+      <h1 className="text-3xl font-bold mb-2">New proposal</h1>
       <p className="text-gray-400 mb-8 max-w-2xl">
-        Three steps: describe your proposal, define who can vote (Merkle snapshot), then
-        submit for admin review.
+        Describe the vote, build a private voter snapshot (Step 2), then submit for admin
+        review. Only the Merkle root goes on-chain — distribute credentials to voters yourself.
       </p>
 
       {!connected ? (
