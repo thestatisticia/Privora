@@ -215,6 +215,35 @@ impl VotingContract {
         Self::spawn_proposal(&env, title, description, duration_seconds, merkle_root)
     }
 
+    /// Reviewer-only: push back the voting deadline (e.g. renew a demo round).
+    pub fn extend_proposal(
+        env: Env,
+        caller: Address,
+        proposal_id: u32,
+        extension_seconds: u64,
+    ) {
+        caller.require_auth();
+        Self::require_reviewer(&env, &caller);
+
+        let mut proposal: Proposal = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Proposal(proposal_id))
+            .unwrap_or_else(|| panic_with_error!(env, VotingError::ProposalNotFound));
+
+        let now = env.ledger().timestamp();
+        if proposal.end_time < now {
+            proposal.end_time = now.saturating_add(extension_seconds);
+        } else {
+            proposal.end_time = proposal.end_time.saturating_add(extension_seconds);
+        }
+        proposal.is_active = true;
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
+    }
+
     /// Internal: materialize a live proposal. Returns the new proposal id.
     fn spawn_proposal(
         env: &Env,

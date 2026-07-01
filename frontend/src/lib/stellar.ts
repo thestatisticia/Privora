@@ -97,18 +97,18 @@ function proposalFromScVal(val: StellarSdk.xdr.ScVal): Proposal | null {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function getProposalCount(): Promise<number> {
-  if (!CONTRACT_ID) return MOCK_PROPOSALS.length;
+  if (!CONTRACT_ID) return getMockProposals().length;
   try {
     const retval = await simulateCall("get_proposal_count");
     if (retval) return Number(StellarSdk.scValToNative(retval));
   } catch {
     /* fall through to mock */
   }
-  return MOCK_PROPOSALS.length;
+  return getMockProposals().length;
 }
 
 export async function getProposal(id: number): Promise<Proposal | null> {
-  if (!CONTRACT_ID) return MOCK_PROPOSALS[id] || null;
+  if (!CONTRACT_ID) return getMockProposals()[id] ?? null;
   try {
     const retval = await simulateCall(
       "get_proposal",
@@ -122,7 +122,7 @@ export async function getProposal(id: number): Promise<Proposal | null> {
 }
 
 export async function getAllProposals(): Promise<Proposal[]> {
-  if (!CONTRACT_ID) return [...MOCK_PROPOSALS];
+  if (!CONTRACT_ID) return [...getMockProposals()];
   try {
     const count = await getProposalCount();
     const results = await Promise.all(
@@ -130,7 +130,7 @@ export async function getAllProposals(): Promise<Proposal[]> {
     );
     return results.filter((p): p is Proposal => p !== null);
   } catch {
-    return [...MOCK_PROPOSALS];
+    return [...getMockProposals()];
   }
 }
 
@@ -298,6 +298,94 @@ export async function createProposal(params: {
     return retval ? Number(StellarSdk.scValToNative(retval)) : -1;
   } catch {
     return -1;
+  }
+}
+
+const DEMO_PROPOSAL_TEMPLATES = [
+  {
+    title: "Allocate 50,000 XLM to Developer Grants",
+    description:
+      "Fund 10 early-stage projects building on Soroban with 5,000 XLM each. Selection by community vote.",
+    durationSeconds: 604_800,
+  },
+  {
+    title: "Adopt ZK Proof Standard for DAO Membership",
+    description:
+      "Ratify the Poseidon-based Merkle tree commitment scheme as the official Privora eligibility standard.",
+    durationSeconds: 604_800,
+  },
+  {
+    title: "Protocol Fee: 0.1% on Treasury Withdrawals",
+    description:
+      "Introduce a 0.1% protocol fee on treasury disbursements above 1,000 XLM into a community reserve.",
+    durationSeconds: 432_000,
+  },
+] as const;
+
+/** Publish fresh live proposals (reviewer wallet signs via Freighter). */
+export async function publishDemoProposals(walletAddress: string): Promise<number[]> {
+  const ids: number[] = [];
+  for (const template of DEMO_PROPOSAL_TEMPLATES) {
+    const id = await createProposal({
+      walletAddress,
+      title: template.title,
+      description: template.description,
+      durationSeconds: template.durationSeconds,
+    });
+    if (id >= 0) ids.push(id);
+  }
+  return ids;
+}
+
+/** Push back a proposal deadline on-chain (requires upgraded contract). */
+export async function extendProposal(params: {
+  walletAddress: string;
+  proposalId: number;
+  extensionSeconds: number;
+}): Promise<void> {
+  const contract = getContract();
+  await signAndSend(
+    params.walletAddress,
+    contract.call(
+      "extend_proposal",
+      StellarSdk.nativeToScVal(params.walletAddress, { type: "address" }),
+      StellarSdk.nativeToScVal(params.proposalId, { type: "u32" }),
+      StellarSdk.nativeToScVal(params.extensionSeconds, { type: "u64" })
+    )
+  );
+}
+
+const RENEW_EXTENSION_SECONDS = 7 * 86_400;
+
+/**
+ * Renew testnet demo voting: extend ended proposals when the contract supports it,
+ * otherwise publish new live proposals.
+ */
+export async function renewTestnetVoting(
+  walletAddress: string,
+  proposals: Proposal[]
+): Promise<{ mode: "extended" | "created"; ids: number[] }> {
+  const now = Math.floor(Date.now() / 1000);
+  const ended = proposals.filter((p) => p.is_active && now >= p.end_time);
+  if (!ended.length) return { mode: "extended", ids: [] };
+
+  try {
+    await extendProposal({
+      walletAddress,
+      proposalId: ended[0].id,
+      extensionSeconds: RENEW_EXTENSION_SECONDS,
+    });
+    for (const p of ended.slice(1)) {
+      await extendProposal({
+        walletAddress,
+        proposalId: p.id,
+        extensionSeconds: RENEW_EXTENSION_SECONDS,
+      });
+    }
+    return { mode: "extended", ids: ended.map((p) => p.id) };
+  } catch {
+    const ids = await publishDemoProposals(walletAddress);
+    return { mode: "created", ids };
   }
 }
 
@@ -578,45 +666,52 @@ export async function getTotalCollectibles(): Promise<number> {
 
 const nowSec = () => Math.floor(Date.now() / 1000);
 
-export const MOCK_PROPOSALS: Proposal[] = [
-  {
-    id: 0,
-    title: "Allocate 50,000 XLM to Developer Grants",
-    description:
-      "Fund 10 early-stage projects building on Soroban with 5,000 XLM each. Selection by community vote. Focus areas: DeFi, privacy tools, and identity.",
-    yes_count: 142,
-    no_count: 31,
-    end_time: nowSec() + 60 * 60 * 24 * 2, // 2 days from now
-    is_active: true,
-  },
-  {
-    id: 1,
-    title: "Adopt ZK Proof Standard for DAO Membership",
-    description:
-      "Ratify the Poseidon-based Merkle tree commitment scheme as the official Privora eligibility standard. All future snapshots must use this format.",
-    yes_count: 89,
-    no_count: 12,
-    end_time: nowSec() + 60 * 60 * 24 * 5, // 5 days from now
-    is_active: true,
-  },
-  {
-    id: 2,
-    title: "Protocol Fee: 0.1% on Treasury Withdrawals",
-    description:
-      "Introduce a 0.1% protocol fee on all treasury disbursements above 1,000 XLM. Fees go into a community reserve multisig controlled by top 5 delegates.",
-    yes_count: 55,
-    no_count: 78,
-    end_time: nowSec() + 60 * 60 * 24 * 1, // 1 day from now
-    is_active: true,
-  },
-  {
-    id: 3,
-    title: "Expand Snapshot Eligibility to 50 XLM",
-    description:
-      "Lower the minimum holding requirement from 100 XLM to 50 XLM to increase voter participation. Retroactive to the next snapshot block.",
-    yes_count: 201,
-    no_count: 44,
-    end_time: nowSec() - 60 * 60 * 2, // ended 2h ago
-    is_active: false,
-  },
-];
+/** Fresh mock deadlines on every read (module-level constants go stale on long-lived servers). */
+export function getMockProposals(): Proposal[] {
+  const now = nowSec();
+  return [
+    {
+      id: 0,
+      title: "Allocate 50,000 XLM to Developer Grants",
+      description:
+        "Fund 10 early-stage projects building on Soroban with 5,000 XLM each. Selection by community vote. Focus areas: DeFi, privacy tools, and identity.",
+      yes_count: 142,
+      no_count: 31,
+      end_time: now + 60 * 60 * 24 * 2,
+      is_active: true,
+    },
+    {
+      id: 1,
+      title: "Adopt ZK Proof Standard for DAO Membership",
+      description:
+        "Ratify the Poseidon-based Merkle tree commitment scheme as the official Privora eligibility standard. All future snapshots must use this format.",
+      yes_count: 89,
+      no_count: 12,
+      end_time: now + 60 * 60 * 24 * 5,
+      is_active: true,
+    },
+    {
+      id: 2,
+      title: "Protocol Fee: 0.1% on Treasury Withdrawals",
+      description:
+        "Introduce a 0.1% protocol fee on all treasury disbursements above 1,000 XLM. Fees go into a community reserve multisig controlled by top 5 delegates.",
+      yes_count: 55,
+      no_count: 78,
+      end_time: now + 60 * 60 * 24 * 1,
+      is_active: true,
+    },
+    {
+      id: 3,
+      title: "Expand Snapshot Eligibility to 50 XLM",
+      description:
+        "Lower the minimum holding requirement from 100 XLM to 50 XLM to increase voter participation. Retroactive to the next snapshot block.",
+      yes_count: 201,
+      no_count: 44,
+      end_time: now - 60 * 60 * 2,
+      is_active: false,
+    },
+  ];
+}
+
+/** @deprecated Use getMockProposals() — static end times expire on long-running servers. */
+export const MOCK_PROPOSALS: Proposal[] = getMockProposals();

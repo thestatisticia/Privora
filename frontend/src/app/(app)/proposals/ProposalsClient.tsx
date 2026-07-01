@@ -33,6 +33,8 @@ export default function ProposalsClient({
   const admin = isReviewer(address);
   const [proposals, setProposals] = useState<Proposal[]>(initialProposals);
   const [refreshing, setRefreshing] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+  const [renewMsg, setRenewMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
 
   const load = useCallback(async () => {
@@ -56,6 +58,28 @@ export default function ProposalsClient({
 
   const votingCount = proposals.filter(isProposalActive).length;
   const totalVotes = proposals.reduce((a, p) => a + p.yes_count + p.no_count, 0);
+  const isTestnet = process.env.NEXT_PUBLIC_NETWORK !== "mainnet";
+  const allEnded = proposals.length > 0 && votingCount === 0;
+
+  const renewVoting = useCallback(async () => {
+    if (!address || !admin) return;
+    setRenewing(true);
+    setRenewMsg(null);
+    try {
+      const { renewTestnetVoting } = await import("@/lib/stellar");
+      const result = await renewTestnetVoting(address, proposals);
+      if (result.mode === "extended") {
+        setRenewMsg(`Extended ${result.ids.length} proposal deadline(s).`);
+      } else {
+        setRenewMsg(`Published ${result.ids.length} new live proposal(s): #${result.ids.join(", #")}.`);
+      }
+      await load();
+    } catch (err: unknown) {
+      setRenewMsg(err instanceof Error ? err.message : "Renew failed");
+    } finally {
+      setRenewing(false);
+    }
+  }, [address, admin, proposals, load]);
 
   return (
     <HubPage wide>
@@ -85,6 +109,29 @@ export default function ProposalsClient({
           </p>
         </div>
       </div>
+
+      {admin && allEnded && isTestnet && (
+        <div className="surface px-4 py-4 mb-6 border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-[var(--foreground)]">All proposals have ended</p>
+            <p className="text-xs text-[var(--muted)] mt-1 max-w-xl">
+              On-chain voting deadlines passed. Renew extends deadlines when supported, or publishes
+              fresh demo proposals (Freighter will ask you to sign).
+            </p>
+            {renewMsg && (
+              <p className="text-xs text-[var(--accent)] mt-2">{renewMsg}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={renewVoting}
+            disabled={renewing || !address}
+            className="btn btn-primary px-5 py-2.5 text-sm shrink-0"
+          >
+            {renewing ? "Renewing…" : "Renew testnet voting"}
+          </button>
+        </div>
+      )}
 
       {admin && (
         <div className="surface px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-[var(--accent)]/25">
