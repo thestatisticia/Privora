@@ -26,24 +26,39 @@ export const PLATFORM_SNAPSHOT: SnapshotMeta = {
 
 type Registry = Record<string, SnapshotMeta>;
 
-async function ensureRegistry(): Promise<Registry> {
+function defaultRegistry(): Registry {
+  return {
+    [normalizeRootToDecimal(PLATFORM_SNAPSHOT.merkleRootDecimal)]: PLATFORM_SNAPSHOT,
+  };
+}
+
+/** In-memory fallback when Vercel's filesystem is read-only or ephemeral. */
+let memoryRegistry: Registry = defaultRegistry();
+
+async function persistRegistry(registry: Registry): Promise<void> {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
-    const raw = await fs.readFile(REGISTRY_FILE, "utf8");
-    return JSON.parse(raw) as Registry;
+    await fs.writeFile(REGISTRY_FILE, JSON.stringify(registry, null, 2));
   } catch {
-    const initial: Registry = {
-      [normalizeRootToDecimal(PLATFORM_SNAPSHOT.merkleRootDecimal)]: PLATFORM_SNAPSHOT,
-    };
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(REGISTRY_FILE, JSON.stringify(initial, null, 2));
-    return initial;
+    /* Vercel/serverless — memory only */
+  }
+}
+
+async function ensureRegistry(): Promise<Registry> {
+  try {
+    const raw = await fs.readFile(REGISTRY_FILE, "utf8");
+    memoryRegistry = JSON.parse(raw) as Registry;
+    return memoryRegistry;
+  } catch {
+    memoryRegistry = defaultRegistry();
+    await persistRegistry(memoryRegistry);
+    return memoryRegistry;
   }
 }
 
 async function saveRegistry(registry: Registry) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(REGISTRY_FILE, JSON.stringify(registry, null, 2));
+  memoryRegistry = registry;
+  await persistRegistry(registry);
 }
 
 export async function registerSnapshot(
@@ -81,6 +96,12 @@ function rootsEqual(a: string, b: string): boolean {
 
 export async function getVoterCountForRoot(root: string | undefined): Promise<number | null> {
   if (!root) return PLATFORM_SNAPSHOT.voterCount;
-  const meta = await getSnapshotMeta(root);
-  return meta?.voterCount ?? null;
+  try {
+    const meta = await getSnapshotMeta(root);
+    return meta?.voterCount ?? null;
+  } catch {
+    return rootsEqual(root, PLATFORM_SNAPSHOT.merkleRootDecimal)
+      ? PLATFORM_SNAPSHOT.voterCount
+      : null;
+  }
 }

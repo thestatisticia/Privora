@@ -21,7 +21,8 @@ export async function GET(
     if (!proposal) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json(await enrichProposal(proposal), {
+    const body = await enrichProposal(proposal).catch(() => proposal);
+    return NextResponse.json(body, {
       headers: { "Cache-Control": "public, s-maxage=20, stale-while-revalidate=60" },
     });
   } catch {

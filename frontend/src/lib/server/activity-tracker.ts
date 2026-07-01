@@ -38,8 +38,12 @@ async function loadState(): Promise<TrackerState> {
 }
 
 async function saveState(state: TrackerState) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+  } catch {
+    /* serverless — skip persist */
+  }
 }
 
 async function loadEvents(): Promise<ActivityEvent[]> {
@@ -52,8 +56,12 @@ async function loadEvents(): Promise<ActivityEvent[]> {
 }
 
 async function saveEvents(events: ActivityEvent[]) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(EVENTS_FILE, JSON.stringify({ events: events.slice(0, 50) }, null, 2));
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(EVENTS_FILE, JSON.stringify({ events: events.slice(0, 50) }, null, 2));
+  } catch {
+    /* serverless — skip persist */
+  }
 }
 
 export async function refreshActivity(proposals: Proposal[]): Promise<ActivityEvent[]> {

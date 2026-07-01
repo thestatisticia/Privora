@@ -44,6 +44,7 @@ export default function VotePage() {
   const { address, connected, connecting, connect } = useWallet();
 
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingProposal, setLoadingProposal] = useState(true);
 
   // Identity / eligibility
@@ -92,8 +93,21 @@ export default function VotePage() {
 
   useEffect(() => {
     fetch(`/api/proposals/${proposalId}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((p: Proposal | null) => setProposal(p))
+      .then(async (r) => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || `HTTP ${r.status}`);
+        }
+        return r.json() as Promise<Proposal>;
+      })
+      .then((p) => {
+        setProposal(p);
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        setProposal(null);
+        setLoadError(err instanceof Error ? err.message : "Failed to load proposal");
+      })
       .finally(() => setLoadingProposal(false));
   }, [proposalId]);
 
@@ -264,8 +278,13 @@ export default function VotePage() {
 
   if (!proposal) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4">
-        <p className="text-gray-400 text-xl">Proposal not found</p>
+      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4 px-6 text-center">
+        <p className="text-gray-400 text-xl">
+          {loadError ? "Could not load proposal" : "Proposal not found"}
+        </p>
+        {loadError && (
+          <p className="text-sm text-rose-400/90 max-w-md break-words">{loadError}</p>
+        )}
         <Link href="/proposals" className="text-stellar-cyan hover:underline">
           ← Back to proposals
         </Link>

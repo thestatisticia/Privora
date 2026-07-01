@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const proposals = await enrichProposals(await getCachedProposals());
+    const raw = await getCachedProposals();
+    const proposals = await enrichProposals(raw).catch(() => raw);
     return NextResponse.json(proposals, {
       headers: {
         "Cache-Control": "public, s-maxage=20, stale-while-revalidate=60",
