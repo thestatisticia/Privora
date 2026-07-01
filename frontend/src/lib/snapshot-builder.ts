@@ -9,14 +9,6 @@ import type { BuiltSnapshot } from "@/lib/types/snapshot";
 export const SNAPSHOT_DEPTH = 4;
 export const SNAPSHOT_MAX_VOTERS = 16;
 
-function randomFieldElement(): bigint {
-  const bytes = new Uint8Array(31);
-  crypto.getRandomValues(bytes);
-  let hex = "";
-  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
-  return BigInt(`0x${hex}`);
-}
-
 function rootToHex(rootDecimal: string): string {
   return BigInt(rootDecimal).toString(16).padStart(64, "0");
 }
@@ -46,16 +38,44 @@ function parseVoterLines(text: string): string[] {
     .slice(0, SNAPSHOT_MAX_VOTERS);
 }
 
-/**
- * Build a voter snapshot from one label per line (wallet, email, or name).
- * Secrets are generated locally — distribute the exported JSON to voters.
- */
-export async function buildSnapshotFromLabels(labelsText: string): Promise<BuiltSnapshot> {
-  const labels = parseVoterLines(labelsText);
-  if (labels.length === 0) {
-    throw new Error("Add at least one voter (one per line).");
+export const PLATFORM_ROOT_DECIMAL =
+  "22889593495014049417157895632155058930916541121165646947370585817827020662216";
+
+export function isPlatformRoot(root: string | undefined): boolean {
+  if (!root) return true;
+  return rootsMatch(root, PLATFORM_ROOT_DECIMAL);
+}
+
+const BN128_FIELD = BigInt(
+  "21888242871839275222246405745257275088548364400416034343698204186575808495617"
+);
+
+/** Deterministic secret per wallet — same address always yields the same leaf. */
+function walletToField(wallet: string): bigint {
+  let v = BigInt(0);
+  for (let i = 0; i < wallet.length; i++) {
+    v = (v * BigInt(131) + BigInt(wallet.charCodeAt(i))) % BN128_FIELD;
   }
-  if (labels.length > SNAPSHOT_MAX_VOTERS) {
+  return v;
+}
+
+async function deriveSecretForWallet(wallet: string): Promise<bigint> {
+  const { buildPoseidon } = await import("circomlibjs");
+  const poseidon = await buildPoseidon();
+  const F = poseidon.F;
+  const w = walletToField(wallet);
+  return BigInt(F.toString(poseidon([w])));
+}
+
+/**
+ * Build a Merkle snapshot from Stellar wallet addresses.
+ * Secrets are derived from each wallet so voters only need to connect Freighter.
+ */
+export async function buildSnapshotFromWallets(wallets: string[]): Promise<BuiltSnapshot> {
+  if (wallets.length === 0) {
+    throw new Error("Add at least one wallet address.");
+  }
+  if (wallets.length > SNAPSHOT_MAX_VOTERS) {
     throw new Error(`Maximum ${SNAPSHOT_MAX_VOTERS} voters per snapshot.`);
   }
 
@@ -63,19 +83,35 @@ export async function buildSnapshotFromLabels(labelsText: string): Promise<Built
   const poseidon = await buildPoseidon();
   const F = poseidon.F;
 
-  const identities: Omit<MockIdentity, "merkleProof">[] = labels.map((label, index) => {
-    const secretIdentity = randomFieldElement();
-    const leafRaw = poseidon([secretIdentity]);
-    const leaf = F.toString(leafRaw);
-    return {
-      index,
-      label,
-      secretIdentity: secretIdentity.toString(),
-      secretIdentityHex: `0x${secretIdentity.toString(16).padStart(62, "0")}`,
-      leaf,
-    };
-  });
+  const identities: Omit<MockIdentity, "merkleProof">[] = await Promise.all(
+    wallets.map(async (wallet, index) => {
+      const secretIdentity = await deriveSecretForWallet(wallet);
+      const leafRaw = poseidon([secretIdentity]);
+      const leaf = F.toString(leafRaw);
+      return {
+        index,
+        label: wallet,
+        secretIdentity: secretIdentity.toString(),
+        secretIdentityHex: `0x${secretIdentity.toString(16).padStart(62, "0")}`,
+        leaf,
+      };
+    })
+  );
 
+  return finishSnapshot(identities, poseidon, F);
+}
+
+/** @deprecated Use buildSnapshotFromWallets — kept for one-per-line text input */
+export async function buildSnapshotFromLabels(labelsText: string): Promise<BuiltSnapshot> {
+  const labels = parseVoterLines(labelsText);
+  return buildSnapshotFromWallets(labels);
+}
+
+async function finishSnapshot(
+  identities: Omit<MockIdentity, "merkleProof">[],
+  poseidon: Awaited<ReturnType<typeof import("circomlibjs")["buildPoseidon"]>>,
+  F: { toString: (n: unknown) => string }
+): Promise<BuiltSnapshot> {
   const leaves = identities.map((id) => BigInt(id.leaf));
   let currentLevel = [...leaves];
   while (currentLevel.length < 2 ** SNAPSHOT_DEPTH) {
@@ -122,9 +158,35 @@ export async function buildSnapshotFromLabels(labelsText: string): Promise<Built
     root: merkleRoot,
     rootHex: rootToHex(merkleRoot),
     depth: SNAPSHOT_DEPTH,
-    voterCount: labels.length,
+    voterCount: identities.length,
     identities: identitiesWithProofs,
   };
+}
+
+/** Resolve a connected wallet to its snapshot identity (rebuilds tree client-side). */
+export async function resolveWalletInSnapshot(
+  wallet: string,
+  wallets: string[],
+  expectedRoot?: string
+): Promise<MockIdentity | null> {
+  if (!wallets.includes(wallet)) return null;
+  const snapshot = await buildSnapshotFromWallets(wallets);
+  const identity = snapshot.identities.find((i) => i.label === wallet) ?? null;
+  if (!identity) return null;
+  if (expectedRoot && !rootsMatch(identity.merkleProof.root, expectedRoot)) return null;
+  return identity;
+}
+
+/** Poseidon(secretIdentity, proposalId) — for custom-snapshot vote checks. */
+export async function computeNullifier(
+  secretIdentity: string,
+  proposalId: number
+): Promise<string> {
+  const { buildPoseidon } = await import("circomlibjs");
+  const poseidon = await buildPoseidon();
+  const F = poseidon.F;
+  const nf = poseidon([BigInt(secretIdentity), BigInt(proposalId)]);
+  return F.toString(nf);
 }
 
 /** Parse a downloaded voter-credentials bundle into MockIdentity entries. */

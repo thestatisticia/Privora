@@ -19,7 +19,7 @@ import ClientTimeRemaining from "@/components/ClientTimeRemaining";
 import VoteProgressBar from "@/components/charts/VoteProgressBar";
 import TurnoutMeter from "@/components/TurnoutMeter";
 import PrivacyReceipt from "@/components/PrivacyReceipt";
-import { rootsMatch, parseVoterCredentialsJson } from "@/lib/snapshot-builder";
+import { rootsMatch, parseVoterCredentialsJson, computeNullifier } from "@/lib/snapshot-builder";
 import {
   HubBackLink,
   HubPage,
@@ -118,17 +118,17 @@ export default function VotePage() {
     };
   }, [proposalId, txHash]);
 
-  // Resolve the connected wallet against the registered voter allowlist.
+  // Resolve wallet against this proposal's voter snapshot.
   useEffect(() => {
     if (!connected || !address || advancedOpen) return;
     let cancelled = false;
-    getIdentityForAddress(address).then((id) => {
+    getIdentityForAddress(address, proposal?.merkleRoot).then((id) => {
       if (!cancelled) setWalletIdentity(id);
     });
     return () => {
       cancelled = true;
     };
-  }, [connected, address, advancedOpen]);
+  }, [connected, address, advancedOpen, proposal?.merkleRoot]);
 
   // Detect whether this identity has already voted on this proposal, before
   // asking the user to generate a (slow) proof.
@@ -138,13 +138,9 @@ export default function VotePage() {
     let cancelled = false;
     (async () => {
       const { isNullifierUsed } = await import("@/lib/stellar");
-      const nf = await getNullifierFor(identity.index, proposalId);
-      if (!nf) {
-        if (!cancelled) {
-          setVoteCheck({ identityIndex: idx, nullifier: null });
-        }
-        return;
-      }
+      const nf =
+        (await getNullifierFor(identity.index, proposalId)) ??
+        (await computeNullifier(identity.secretIdentity, proposalId));
       const used = await isNullifierUsed(nf, proposalId);
       if (!cancelled) {
         setVoteCheck({ identityIndex: idx, nullifier: used ? nf : null });
@@ -468,9 +464,9 @@ export default function VotePage() {
               {!connected ? (
                 <>
                   <p className="text-gray-400 text-sm mb-5">
-                    Connect your Stellar wallet to check eligibility against the
-                    voter snapshot. Proofs are generated locally — your wallet is
-                    never linked to your vote.
+                    Connect Freighter — if your wallet was on the proposal&apos;s voter
+                    list, you&apos;ll be marked eligible automatically. Your wallet is
+                    never linked to your vote on-chain.
                   </p>
                   <button
                     onClick={connect}

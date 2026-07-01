@@ -46,13 +46,16 @@ async function saveRegistry(registry: Registry) {
   await fs.writeFile(REGISTRY_FILE, JSON.stringify(registry, null, 2));
 }
 
-export async function registerSnapshot(meta: Omit<SnapshotMeta, "createdAt">): Promise<SnapshotMeta> {
+export async function registerSnapshot(
+  meta: Omit<SnapshotMeta, "createdAt"> & { wallets?: string[] }
+): Promise<SnapshotMeta> {
   const registry = await ensureRegistry();
   const key = normalizeRootToDecimal(meta.merkleRootDecimal);
   const entry: SnapshotMeta = {
     ...meta,
     merkleRootDecimal: key,
     merkleRootHex: meta.merkleRootHex.replace(/^0x/i, "").padStart(64, "0"),
+    wallets: meta.wallets,
     createdAt: new Date().toISOString(),
   };
   registry[key] = entry;

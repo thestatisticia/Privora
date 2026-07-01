@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
-  buildSnapshotFromLabels,
+  buildSnapshotFromWallets,
   downloadSnapshotBundle,
   SNAPSHOT_MAX_VOTERS,
 } from "@/lib/snapshot-builder";
@@ -35,7 +35,11 @@ function parseWalletLines(text: string): { valid: string[]; invalid: string[] } 
   return { valid: valid.slice(0, SNAPSHOT_MAX_VOTERS), invalid };
 }
 
-async function registerSnapshot(snapshot: BuiltSnapshot, label?: string): Promise<void> {
+async function registerSnapshot(
+  snapshot: BuiltSnapshot,
+  wallets: string[],
+  label?: string
+): Promise<void> {
   await fetch("/api/snapshots", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -43,6 +47,7 @@ async function registerSnapshot(snapshot: BuiltSnapshot, label?: string): Promis
       merkleRootDecimal: snapshot.root,
       merkleRootHex: snapshot.rootHex,
       voterCount: snapshot.voterCount,
+      wallets,
       label,
     }),
   });
@@ -73,8 +78,8 @@ export function useSnapshotSelection() {
     setBuilding(true);
     setBuildError(null);
     try {
-      const snapshot = await buildSnapshotFromLabels(parsed.valid.join("\n"));
-      await registerSnapshot(snapshot, "Custom proposal snapshot");
+      const snapshot = await buildSnapshotFromWallets(parsed.valid);
+      await registerSnapshot(snapshot, parsed.valid, "Custom proposal snapshot");
       setCustomSnapshot(snapshot);
     } catch (err) {
       setBuildError(err instanceof Error ? err.message : "Failed to build snapshot");
@@ -137,9 +142,9 @@ export function SnapshotBuilderPanel(props: ReturnType<typeof useSnapshotSelecti
         <h2 className="text-lg font-semibold mb-2">Eligible voter snapshot</h2>
         <p className="text-sm text-gray-400 leading-relaxed">
           Paste the <strong className="text-gray-300">Stellar wallet addresses</strong> allowed
-          to vote. Privora builds a Merkle tree from them and stores the root on-chain with your
-          proposal. Each wallet gets a private voting credential — wallets never appear on the
-          ballot.
+          to vote. Privora builds a Merkle tree and stores the root on-chain. Listed wallets
+          can connect Freighter on the vote page and are recognized automatically — no copy/paste
+          required.
         </p>
       </div>
 
@@ -262,19 +267,18 @@ export function SnapshotBuilderPanel(props: ReturnType<typeof useSnapshotSelecti
                 0x{customSnapshot.rootHex}
               </p>
               <div className="text-xs text-gray-400 space-y-1.5 border-t border-stellar-cyan/10 pt-3">
-                <p className="font-medium text-gray-300">After approval, send each voter:</p>
-                <ol className="list-decimal list-inside space-y-1 text-gray-500">
-                  <li>Download the credentials file below</li>
-                  <li>Match each row to a wallet (same order you pasted)</li>
-                  <li>Voter imports JSON on the vote page → Advanced</li>
-                </ol>
+                <p className="font-medium text-gray-300">After approval:</p>
+                <p className="text-gray-500">
+                  Wallets on this list connect Freighter on the vote page — eligibility is
+                  automatic. The credentials file is optional backup for auditors.
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => downloadSnapshotBundle(customSnapshot)}
                 className="btn btn-secondary w-full py-2.5 text-sm"
               >
-                Download voter credentials (.json)
+                Download voter credentials (.json) — optional
               </button>
             </div>
           )}
